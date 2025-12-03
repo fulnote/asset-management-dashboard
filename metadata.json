@@ -1,0 +1,5 @@
+{
+  "name": "Personal Asset Management Dashboard",
+  "description": "A modern, visual dashboard to consolidate and track your financial assets. This application helps users visualize their total net worth, asset allocation, and trends over time, providing a clear picture of their financial health.",
+  "requestFramePermissions": []
+}
