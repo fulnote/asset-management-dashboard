@@ -1,17 +1,27 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { WalletIcon } from './IconComponents';
 
 interface UrlSetupProps {
-  onUrlSubmit: (url: string) => void;
+  onSettingsSubmit: (scriptUrl: string, sheetUrl: string) => void;
+  initialScriptUrl?: string;
+  initialSheetUrl?: string;
+  onCancel?: () => void;
 }
 
-const UrlSetup: React.FC<UrlSetupProps> = ({ onUrlSubmit }) => {
-  const [url, setUrl] = useState('');
+const UrlSetup: React.FC<UrlSetupProps> = ({ onSettingsSubmit, initialScriptUrl = '', initialSheetUrl = '', onCancel }) => {
+  const [url, setUrl] = useState(initialScriptUrl);
+  const [sheetUrl, setSheetUrl] = useState(initialSheetUrl);
+
+  useEffect(() => {
+    setUrl(initialScriptUrl);
+    setSheetUrl(initialSheetUrl);
+  }, [initialScriptUrl, initialSheetUrl]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (url.trim()) {
-      onUrlSubmit(url.trim());
+      onSettingsSubmit(url.trim(), sheetUrl.trim());
     }
   };
 
@@ -25,14 +35,14 @@ const UrlSetup: React.FC<UrlSetupProps> = ({ onUrlSubmit }) => {
                 資産管理ダッシュボード
                 </h1>
             </div>
-          <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Google Apps Script連携設定</h2>
+          <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">連携設定</h2>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Googleスプレッドシートのデータを表示するには、ウェブアプリのURLを設定してください。
+            Googleスプレッドシートのデータを表示するためのURLを設定します。
           </p>
         </div>
 
         <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200">URLの取得方法:</h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200">ウェブアプリURLの取得方法:</h3>
             <ol className="mt-2 list-decimal list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
                 <li>連携したいGoogleスプレッドシートを開きます。</li>
                 <li>メニューから「拡張機能」→「Apps Script」を選択します。</li>
@@ -46,7 +56,7 @@ const UrlSetup: React.FC<UrlSetupProps> = ({ onUrlSubmit }) => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="gas-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              ウェブアプリのURL
+              ウェブアプリのURL <span className="text-red-500">*</span>
             </label>
             <div className="mt-1">
               <input
@@ -64,11 +74,41 @@ const UrlSetup: React.FC<UrlSetupProps> = ({ onUrlSubmit }) => {
           </div>
 
           <div>
+            <label htmlFor="sheet-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              GoogleスプレッドシートのURL (任意)
+            </label>
+            <div className="mt-1">
+              <input
+                id="sheet-url"
+                name="sheetUrl"
+                type="url"
+                className="block w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                value={sheetUrl}
+                onChange={(e) => setSheetUrl(e.target.value)}
+                aria-label="GoogleスプレッドシートのURL"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                設定すると、画面上部のボタンからシートを直接開けるようになります。
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
+              >
+                キャンセル
+              </button>
+            )}
             <button
               type="submit"
-              className="flex justify-center w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="flex-1 flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              保存してダッシュボードを表示
+              保存して表示
             </button>
           </div>
         </form>

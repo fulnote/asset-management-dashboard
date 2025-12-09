@@ -1,12 +1,14 @@
+
 import React from 'react';
-import { WalletIcon, CogIcon, RefreshIcon } from './IconComponents';
+import { WalletIcon, CogIcon, RefreshIcon, TableIcon } from './IconComponents';
 
 interface HeaderProps {
   onResetUrl: () => void;
   onRefresh: () => void;
+  spreadsheetUrl?: string | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ onResetUrl, onRefresh }) => {
+const Header: React.FC<HeaderProps> = ({ onResetUrl, onRefresh, spreadsheetUrl }) => {
   return (
     <header className="bg-white dark:bg-gray-800 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -18,9 +20,22 @@ const Header: React.FC<HeaderProps> = ({ onResetUrl, onRefresh }) => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            {spreadsheetUrl && (
+                <a
+                  href={spreadsheetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-full text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
+                  title="スプレッドシートを開く"
+                  aria-label="スプレッドシートを開く"
+                >
+                  <TableIcon className="h-6 w-6" />
+                </a>
+            )}
             <button
               onClick={onRefresh}
               className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
+              title="更新"
               aria-label="更新"
             >
               <RefreshIcon className="h-6 w-6" />
@@ -28,6 +43,7 @@ const Header: React.FC<HeaderProps> = ({ onResetUrl, onRefresh }) => {
             <button
               onClick={onResetUrl}
               className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
+              title="設定"
               aria-label="設定"
             >
               <CogIcon className="h-6 w-6" />

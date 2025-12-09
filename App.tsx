@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Asset, AssetType, AssetHistoryByCategoryPoint } from './types';
 import Dashboard from './components/Dashboard';
@@ -9,8 +10,14 @@ const App: React.FC = () => {
   const [historyByCategory, setHistoryByCategory] = useState<AssetHistoryByCategoryPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isConfiguring, setIsConfiguring] = useState(false);
+  
   const [googleScriptUrl, setGoogleScriptUrl] = useState<string | null>(() => {
     return localStorage.getItem('googleScriptUrl');
+  });
+
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(() => {
+    return localStorage.getItem('spreadsheetUrl');
   });
 
   useEffect(() => {
@@ -20,6 +27,14 @@ const App: React.FC = () => {
       localStorage.removeItem('googleScriptUrl');
     }
   }, [googleScriptUrl]);
+
+  useEffect(() => {
+    if (spreadsheetUrl) {
+      localStorage.setItem('spreadsheetUrl', spreadsheetUrl);
+    } else {
+      localStorage.removeItem('spreadsheetUrl');
+    }
+  }, [spreadsheetUrl]);
 
   const fetchData = useCallback(async () => {
     if (!googleScriptUrl) {
@@ -112,13 +127,19 @@ const App: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleUrlSubmit = (url: string) => {
-    setGoogleScriptUrl(url);
+  const handleSettingsSubmit = (scriptUrl: string, sheetUrl: string) => {
+    setGoogleScriptUrl(scriptUrl);
+    setSpreadsheetUrl(sheetUrl);
+    setIsConfiguring(false);
   };
 
-  const handleResetUrl = () => {
-    setGoogleScriptUrl(null);
+  const handleEnterConfigMode = () => {
+    setIsConfiguring(true);
   };
+  
+  const handleCancelConfig = () => {
+    setIsConfiguring(false);
+  }
 
   const handleRefresh = () => {
     fetchData();
@@ -173,8 +194,15 @@ const App: React.FC = () => {
     return Array.from(breakdownMap.entries()).map(([name, value]) => ({ name, value }));
   }, [assets]);
   
-  if (!googleScriptUrl) {
-    return <UrlSetup onUrlSubmit={handleUrlSubmit} />;
+  if (!googleScriptUrl || isConfiguring) {
+    return (
+        <UrlSetup 
+            onSettingsSubmit={handleSettingsSubmit} 
+            initialScriptUrl={googleScriptUrl || ''}
+            initialSheetUrl={spreadsheetUrl || ''}
+            onCancel={googleScriptUrl ? handleCancelConfig : undefined}
+        />
+    );
   }
 
   if (isLoading) {
@@ -192,10 +220,10 @@ const App: React.FC = () => {
           <h2 className="text-2xl font-bold text-red-500 dark:text-red-400 mb-4">データ取得エラー</h2>
           <p className="text-gray-700 dark:text-gray-300 break-words">{error}</p>
           <button
-            onClick={handleResetUrl}
+            onClick={handleEnterConfigMode}
             className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
           >
-            URLを再設定する
+            設定を確認する
           </button>
         </div>
       </div>
@@ -204,7 +232,11 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
-      <Header onResetUrl={handleResetUrl} onRefresh={handleRefresh} />
+      <Header 
+        onResetUrl={handleEnterConfigMode} 
+        onRefresh={handleRefresh} 
+        spreadsheetUrl={spreadsheetUrl}
+      />
       <main className="p-2 sm:p-6 lg:p-8">
         <Dashboard
           totalAssets={totalAssets}
