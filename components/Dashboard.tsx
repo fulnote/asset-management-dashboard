@@ -5,6 +5,7 @@ import TotalBalanceCard from './TotalBalanceCard';
 import AssetTrendChart from './AssetTrendChart';
 import AssetBreakdownChart from './AssetBreakdownChart';
 import AssetList from './AssetList';
+import MonthlyReport from './MonthlyReport';
 
 interface DashboardProps {
   totalAssets: number;
@@ -52,6 +53,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
         <AssetBreakdownChart data={assetBreakdown} />
       </div>
+
+      <MonthlyReport assetHistory={assetHistory} />
 
       <div>
         <div className="flex justify-between items-center mb-4">
