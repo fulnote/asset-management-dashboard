@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Asset, AssetType } from '../types';
 import Card from './Card';
-import { ChevronDownIcon, ChartBarIcon } from './IconComponents';
+import { ChevronDownIcon, ChartBarIcon, ExternalLinkIcon } from './IconComponents';
 
 type Grouping = 'individual' | 'name' | 'owner';
 
@@ -36,6 +36,16 @@ const getAssetTypeColor = (type: AssetType) => {
     [AssetType.Liability]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
   };
   return colors[type];
+};
+
+const getYahooFinanceUrl = (ticker: string, type: AssetType) => {
+  if (type === AssetType.InvestmentTrust || type === AssetType.DC) {
+    return `https://finance.yahoo.co.jp/quote/${ticker}`;
+  }
+  if (/^\d{4}$/.test(ticker)) {
+    return `https://finance.yahoo.co.jp/quote/${ticker}.T`;
+  }
+  return `https://finance.yahoo.com/quote/${ticker}`;
 };
 
 const AssetRow: React.FC<{asset: Asset; onAssetSelect?: (name: string) => void}> = ({ asset, onAssetSelect }) => {
@@ -135,6 +145,22 @@ const AssetRow: React.FC<{asset: Asset; onAssetSelect?: (name: string) => void}>
                             </>
                            )}
                         </div>
+
+                        {asset.tickerSymbol && (asset.type === AssetType.Stocks || asset.type === AssetType.MarginStocks || asset.type === AssetType.InvestmentTrust || asset.type === AssetType.DC) && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">銘柄詳細・株価情報</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <a 
+                                        href={getYahooFinanceUrl(asset.tickerSymbol, asset.type)} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                    >
+                                        {asset.type === AssetType.InvestmentTrust || asset.type === AssetType.DC || /^\d{4}$/.test(asset.tickerSymbol) ? 'Yahoo!ファイナンス' : 'Yahoo Finance (US)'} <ExternalLinkIcon className="w-3 h-3 ml-1" />
+                                    </a>
+                                </div>
+                            </div>
+                        )}
                     </td>
                 </tr>
             )}
@@ -241,6 +267,18 @@ const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }
                             >
                                 <ChartBarIcon className="w-4 h-4" />
                             </button>
+                        )}
+                        {grouping === 'name' && group.assets[0]?.tickerSymbol && (group.assets[0].type === AssetType.Stocks || group.assets[0].type === AssetType.MarginStocks || group.assets[0].type === AssetType.InvestmentTrust || group.assets[0].type === AssetType.DC) && (
+                            <a 
+                                href={getYahooFinanceUrl(group.assets[0].tickerSymbol, group.assets[0].type)}
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="ml-1 px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[10px] font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex-shrink-0"
+                                title="Yahoo!ファイナンスで表示"
+                            >
+                                Y!
+                            </a>
                         )}
                       </div>
                     </td>
