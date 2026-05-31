@@ -54,7 +54,7 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
                     <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: entry.color }}></span>
                     <span className="text-gray-600 dark:text-gray-300">{entry.name}:</span>
                 </div>
-                <span className="font-medium text-gray-800 dark:text-gray-100 ml-2">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(entry.value)}円</span>
+                <span className="font-semibold text-gray-800 dark:text-gray-100 ml-2 font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(entry.value)}円</span>
             </div>
           ))}
         </div>
@@ -62,7 +62,7 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
         <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
             <div className="flex justify-between items-center text-sm font-bold">
                 <span className="text-gray-800 dark:text-gray-200">現物資産合計:</span>
-                <span className="text-gray-900 dark:text-gray-100">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(totalDisplayed)}円</span>
+                <span className="text-gray-900 dark:text-gray-100 font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(totalDisplayed)}円</span>
             </div>
         </div>
       </div>
@@ -86,7 +86,7 @@ const IndividualTooltip = ({ active, payload, label }: any) => {
                       <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: entry.color }}></span>
                       <span className="text-gray-600 dark:text-gray-300 max-w-[150px] truncate" title={entry.name}>{entry.name}:</span>
                   </div>
-                  <span className="font-medium text-gray-800 dark:text-gray-100 ml-2">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(entry.value)}円</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-100 ml-2 font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(entry.value)}円</span>
               </div>
             ))}
           </div>
@@ -96,13 +96,50 @@ const IndividualTooltip = ({ active, payload, label }: any) => {
     return null;
   };
 
+const parseSafeDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  const cleanStr = dateStr.trim();
+  
+  // 1. Try parsing directly
+  let d = new Date(cleanStr);
+  if (!isNaN(d.getTime())) return d;
+  
+  // 2. Handle space separated dates -> T separated ISO dates (e.g. "2026-05-31 20:15:06" -> "2026-05-31T20:15:06")
+  if (cleanStr.includes(' ')) {
+    const isoStr = cleanStr.replace(' ', 'T');
+    d = new Date(isoStr);
+    if (!isNaN(d.getTime())) return d;
+  }
+  
+  // 3. Keep pure YYYY-MM-DD on Local timezone (hyphens replacement to slashes helps cross-browser consistency)
+  if (cleanStr.includes('-') && !cleanStr.includes('T')) {
+    const slashStr = cleanStr.replace(/-/g, '/');
+    d = new Date(slashStr);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 4. Manual parsing fallback
+  const match = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) return d;
+  }
+  
+  return null;
+};
+
 interface AssetTrendChartProps {
   data: AssetHistoryByCategoryPoint[];
   selectedAsset?: { name: string, timestamp: number } | null;
 }
 
 const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }) => {
+  type TimeRange = '1M' | '3M' | '6M' | '1Y' | 'YTD' | 'ALL';
   const [viewMode, setViewMode] = useState<'category' | 'individual'>('category');
+  const [timeRange, setTimeRange] = useState<TimeRange>('ALL');
   const [selectedIndividualKeys, setSelectedIndividualKeys] = useState<string[]>([]);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
@@ -153,6 +190,51 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
     return { processedData: processed, categoryKeys: detectedCategoryKeys, individualKeys: detectedIndividualKeys };
   }, [data, isDataValid]);
 
+  // Filter processedData based on selected time range
+  const filteredData = useMemo(() => {
+    if (timeRange === 'ALL') return processedData;
+    if (processedData.length === 0) return processedData;
+
+    try {
+      const latestDateStr = processedData[processedData.length - 1].date as string;
+      if (!latestDateStr) return processedData;
+
+      const refDate = parseSafeDate(latestDateStr);
+      if (!refDate) {
+        console.warn('Could not parse latest date reference:', latestDateStr);
+        return processedData;
+      }
+
+      const limitDate = new Date(refDate.getTime());
+
+      if (timeRange === '1M') {
+        limitDate.setMonth(refDate.getMonth() - 1);
+      } else if (timeRange === '3M') {
+        limitDate.setMonth(refDate.getMonth() - 3);
+      } else if (timeRange === '6M') {
+        limitDate.setMonth(refDate.getMonth() - 6);
+      } else if (timeRange === '1Y') {
+        limitDate.setFullYear(refDate.getFullYear() - 1);
+      } else if (timeRange === 'YTD') {
+        const currentYear = refDate.getFullYear();
+        const ytdLimitTime = new Date(currentYear, 0, 1).getTime();
+        return processedData.filter(d => {
+          const dDate = parseSafeDate(d.date as string);
+          return dDate !== null && dDate.getTime() >= ytdLimitTime;
+        });
+      }
+
+      const limitTime = limitDate.getTime();
+      return processedData.filter(d => {
+        const dDate = parseSafeDate(d.date as string);
+        return dDate !== null && dDate.getTime() >= limitTime;
+      });
+    } catch (e) {
+      console.error('Error filtering trend data:', e);
+      return processedData;
+    }
+  }, [processedData, timeRange]);
+
   const formatXAxisDate = (dateStr: string) => {
     if (!dateStr) return '';
     const cleanStr = dateStr.replace(/-/g, '/').split(/[ T]/)[0];
@@ -162,11 +244,11 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
       const month = parseInt(parts[1], 10);
       const day = parseInt(parts[2], 10);
       
-      const isFirstDate = processedData[0]?.date === dateStr;
+      const isFirstDate = filteredData[0]?.date === dateStr;
       let isYearChange = false;
-      const index = processedData.findIndex(d => d.date === dateStr);
+      const index = filteredData.findIndex(d => d.date === dateStr);
       if (index > 0) {
-        const prevDateStr = processedData[index - 1]?.date as string;
+        const prevDateStr = filteredData[index - 1]?.date as string;
         if (prevDateStr) {
           const prevYear = prevDateStr.replace(/-/g, '/').split('/')[0];
           isYearChange = prevYear !== year;
@@ -236,22 +318,48 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
 
   return (
     <Card className="scroll-mt-24" id="asset-trend-chart">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 gap-4">
         <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">資産推移</h3>
         
-        <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-1 shrink-0">
-            <button 
-                onClick={() => setViewMode('category')} 
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'category' ? 'bg-white dark:bg-gray-800 shadow text-blue-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
-            >
-                カテゴリー別
-            </button>
-            <button 
-                onClick={() => setViewMode('individual')} 
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === 'individual' ? 'bg-white dark:bg-gray-800 shadow text-blue-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
-            >
-                銘柄別
-            </button>
+        <div className="flex flex-wrap items-center gap-2">
+            {/* Time Range Filter Group */}
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-0.5">
+                {(['1M', '3M', '6M', '1Y', 'YTD', 'ALL'] as TimeRange[]).map((range) => {
+                    const labelMap: Record<TimeRange, string> = {
+                        '1M': '1ヶ月',
+                        '3M': '3ヶ月',
+                        '6M': '6ヶ月',
+                        '1Y': '1年',
+                        'YTD': '年初来',
+                        'ALL': '全期間'
+                    };
+                    return (
+                        <button
+                            key={range}
+                            onClick={() => setTimeRange(range)}
+                            className={`px-2 py-1 text-xs font-semibold rounded transition-all ${timeRange === range ? 'bg-white dark:bg-gray-700 shadow text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                        >
+                            {labelMap[range]}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* View Mode Selector */}
+            <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-1 shrink-0">
+                <button 
+                    onClick={() => setViewMode('category')} 
+                    className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${viewMode === 'category' ? 'bg-white dark:bg-gray-800 shadow text-blue-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                >
+                    カテゴリー別
+                </button>
+                <button 
+                    onClick={() => setViewMode('individual')} 
+                    className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${viewMode === 'individual' ? 'bg-white dark:bg-gray-800 shadow text-blue-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                >
+                    銘柄別
+                </button>
+            </div>
         </div>
       </div>
 
@@ -304,7 +412,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
       <div style={{ width: '100%', height: 300 }}>
         <ResponsiveContainer>
             {viewMode === 'category' ? (
-                <AreaChart data={processedData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <AreaChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
                     <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
@@ -324,7 +432,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
                     ))}
                 </AreaChart>
             ) : (
-                 <LineChart data={processedData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                 <LineChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
                     <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
