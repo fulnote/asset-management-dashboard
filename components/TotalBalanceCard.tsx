@@ -26,11 +26,11 @@ const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ title, amount, colo
     <Card className="flex flex-col justify-between">
       <h3 className="text-lg font-medium text-gray-500 dark:text-gray-400">{title}</h3>
       <div className={`flex items-baseline gap-2 ${isNetWorth ? 'mt-2' : ''}`}>
-        <p className={`text-2xl sm:text-3xl font-bold ${displayColor}`}>
+        <p className={`text-2xl sm:text-3xl font-bold font-mono tabular-nums ${displayColor}`}>
           {formatCurrency(amount, { signDisplay: isProfitLossCard ? 'always' : 'auto' })}
         </p>
         {isProfitLossCard && changeRate != null && (
-          <p className={`text-base sm:text-lg font-semibold ${profitColor}`}>
+          <p className={`text-base sm:text-lg font-semibold font-mono tabular-nums ${profitColor}`}>
             ({formatPercent(changeRate, { signDisplay: 'always' })})
           </p>
         )}

@@ -89,7 +89,7 @@ const AssetRow: React.FC<{asset: Asset; onAssetSelect?: (name: string) => void}>
                     {asset.type}
                   </span>
                 </td>
-                <td className={`px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right font-semibold ${asset.type === AssetType.Liability ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>{formatCurrency(asset.value)}</td>
+                <td className={`px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right font-semibold font-mono tabular-nums ${asset.type === AssetType.Liability ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>{formatCurrency(asset.value)}</td>
             </tr>
             {isExpanded && hasDetails && (
                  <tr className="bg-gray-50 dark:bg-gray-800/50">
@@ -112,13 +112,13 @@ const AssetRow: React.FC<{asset: Asset; onAssetSelect?: (name: string) => void}>
                                 {asset.purchaseAmount != null && (
                                     <div>
                                         <p className="font-semibold text-gray-600 dark:text-gray-300">{purchaseAmountLabel}</p>
-                                        <p className="text-gray-800 dark:text-gray-100">{formatCurrency(asset.purchaseAmount)}</p>
+                                        <p className="text-gray-800 dark:text-gray-100 font-mono tabular-nums">{formatCurrency(asset.purchaseAmount)}</p>
                                     </div>
                                 )}
                                 {asset.profitOrLoss != null && (
                                     <div>
                                         <p className="font-semibold text-gray-600 dark:text-gray-300">評価損益 (率)</p>
-                                        <p className={profitOrLossColor}>
+                                        <p className={`${profitOrLossColor} font-mono tabular-nums`}>
                                             {formatCurrency(asset.profitOrLoss, {signDisplay: 'always'})}
                                             {asset.profitOrLossRate != null && ` (${formatPercent(asset.profitOrLossRate, {signDisplay: 'always'})})`}
                                         </p>
@@ -127,19 +127,19 @@ const AssetRow: React.FC<{asset: Asset; onAssetSelect?: (name: string) => void}>
                                 {asset.shares != null && (
                                      <div>
                                         <p className="font-semibold text-gray-600 dark:text-gray-300">{sharesLabel}</p>
-                                        <p className="text-gray-800 dark:text-gray-100">{asset.shares}</p>
+                                        <p className="text-gray-800 dark:text-gray-100"><span className="font-mono tabular-nums">{asset.shares}</span></p>
                                     </div>
                                 )}
                                 {asset.avgPurchasePrice != null && (
                                     <div>
                                         <p className="font-semibold text-gray-600 dark:text-gray-300">{avgPriceLabel}</p>
-                                        <p className="text-gray-800 dark:text-gray-100">{formatCurrency(asset.avgPurchasePrice)}</p>
+                                        <p className="text-gray-800 dark:text-gray-100"><span className="font-mono tabular-nums">{formatCurrency(asset.avgPurchasePrice)}</span></p>
                                     </div>
                                 )}
                                 {asset.currentPrice != null && (
                                    <div>
                                        <p className="font-semibold text-gray-600 dark:text-gray-300">{currentPriceLabel}</p>
-                                       <p className="text-gray-800 dark:text-gray-100">{formatCurrency(asset.currentPrice)}</p>
+                                       <p className="text-gray-800 dark:text-gray-100"><span className="font-mono tabular-nums">{formatCurrency(asset.currentPrice)}</span></p>
                                    </div>
                                 )}
                             </>
@@ -283,8 +283,8 @@ const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }
                       </div>
                     </td>
                     <td className="px-2 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm text-right">
-                      <div className="font-semibold text-gray-700 dark:text-gray-300">{formatCurrency(group.totalValue)}</div>
-                      <div className={`mt-1 text-xs ${profitOrLossColor}`}>
+                      <div className="font-semibold text-gray-700 dark:text-gray-300 font-mono tabular-nums">{formatCurrency(group.totalValue)}</div>
+                      <div className={`mt-1 text-xs ${profitOrLossColor} font-mono tabular-nums`}>
                           {formatCurrency(group.totalProfitOrLoss, { signDisplay: 'always' })}
                           <span className="ml-1">({formatPercent(group.totalProfitOrLossRate, { signDisplay: 'always' })})</span>
                       </div>

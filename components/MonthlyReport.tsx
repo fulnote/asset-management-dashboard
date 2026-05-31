@@ -157,6 +157,19 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
     return (value > 0 ? '+' : '') + value.toFixed(2) + '%';
   };
 
+  const formatShortDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const cleanStr = dateStr.replace(/-/g, '/').split(/[ T]/)[0];
+    const parts = cleanStr.split('/');
+    if (parts.length >= 3) {
+      const year = parts[0].slice(-2); // 2026 -> 26
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      return `${year}/${month}/${day}`;
+    }
+    return dateStr;
+  };
+
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
@@ -177,13 +190,13 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
             </div>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            比較対象: {reportData.prevDate}
+            比較対象: {formatShortDate(reportData.prevDate)}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
           <div className="text-right">
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">純資産 前月比</div>
-            <div className={`text-lg font-bold flex items-center justify-end ${reportData.netWorth.diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            <div className={`text-lg font-bold font-mono tabular-nums flex items-center justify-end ${reportData.netWorth.diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
               {reportData.netWorth.diff >= 0 ? <TrendingUpIcon className="w-5 h-5 mr-1" /> : <TrendingDownIcon className="w-5 h-5 mr-1" />}
               {formatPercent(reportData.netWorth.percent)}
             </div>
@@ -191,7 +204,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
           {reportData.netWorth.hasYtd && (
             <div className="text-right">
               <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">純資産 年初来(YTD)</div>
-              <div className={`text-lg font-bold flex items-center justify-end ${reportData.netWorth.ytdDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              <div className={`text-lg font-bold font-mono tabular-nums flex items-center justify-end ${reportData.netWorth.ytdDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 {reportData.netWorth.ytdDiff >= 0 ? <TrendingUpIcon className="w-5 h-5 mr-1" /> : <TrendingDownIcon className="w-5 h-5 mr-1" />}
                 {formatPercent(reportData.netWorth.ytdPercent)}
               </div>
@@ -215,9 +228,9 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
             {reportData.comparison.map((item) => (
               <tr key={item.category} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                 <td className="px-6 py-4 text-sm font-medium text-gray-800 dark:text-gray-200">{item.category}</td>
-                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 text-right">{formatCurrency(item.prevVal)}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-gray-800 dark:text-gray-200 text-right">{formatCurrency(item.currentVal)}</td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 text-right font-mono tabular-nums">{formatCurrency(item.prevVal)}</td>
+                <td className="px-6 py-4 text-sm font-semibold text-gray-800 dark:text-gray-200 text-right font-mono tabular-nums">{formatCurrency(item.currentVal)}</td>
+                <td className="px-6 py-4 text-right font-mono tabular-nums">
                   <div className={`text-sm font-medium ${item.diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                     {item.diff > 0 ? '+' : ''}{formatCurrency(item.diff)}
                   </div>
@@ -226,7 +239,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
                     {formatPercent(item.percentChange)}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right font-mono tabular-nums">
                   {item.hasYtd ? (
                     <>
                       <div className={`text-sm font-medium ${item.ytdDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
@@ -245,9 +258,9 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
             ))}
             <tr className="bg-gray-50 dark:bg-gray-700/50 font-bold">
               <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">純資産 合計</td>
-              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">{formatCurrency(reportData.netWorth.prev)}</td>
-              <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right">{formatCurrency(reportData.netWorth.current)}</td>
-              <td className="px-6 py-4 text-right">
+              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right font-mono tabular-nums">{formatCurrency(reportData.netWorth.prev)}</td>
+              <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right font-mono tabular-nums">{formatCurrency(reportData.netWorth.current)}</td>
+              <td className="px-6 py-4 text-right font-mono tabular-nums">
                 <div className={`text-sm ${reportData.netWorth.diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                   {reportData.netWorth.diff > 0 ? '+' : ''}{formatCurrency(reportData.netWorth.diff)}
                 </div>
@@ -255,7 +268,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ assetHistory }) => {
                   {formatPercent(reportData.netWorth.percent)}
                 </div>
               </td>
-              <td className="px-6 py-4 text-right">
+              <td className="px-6 py-4 text-right font-mono tabular-nums">
                 {reportData.netWorth.hasYtd ? (
                   <>
                     <div className={`text-sm ${reportData.netWorth.ytdDiff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>

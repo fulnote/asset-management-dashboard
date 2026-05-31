@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { AssetHistoryByCategoryPoint, AssetType } from '../types';
@@ -154,6 +153,35 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
     return { processedData: processed, categoryKeys: detectedCategoryKeys, individualKeys: detectedIndividualKeys };
   }, [data, isDataValid]);
 
+  const formatXAxisDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const cleanStr = dateStr.replace(/-/g, '/').split(/[ T]/)[0];
+    const parts = cleanStr.split('/');
+    if (parts.length >= 3) {
+      const year = parts[0];
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      
+      const isFirstDate = processedData[0]?.date === dateStr;
+      let isYearChange = false;
+      const index = processedData.findIndex(d => d.date === dateStr);
+      if (index > 0) {
+        const prevDateStr = processedData[index - 1]?.date as string;
+        if (prevDateStr) {
+          const prevYear = prevDateStr.replace(/-/g, '/').split('/')[0];
+          isYearChange = prevYear !== year;
+        }
+      }
+      
+      const formattedYear = year.slice(-2);
+      if (isFirstDate || isYearChange || month === 1) {
+        return `${month}/${day} '${formattedYear}`;
+      }
+      return `${month}/${day}`;
+    }
+    return dateStr;
+  };
+
   // Handle external selection (e.g. from AssetList)
   useEffect(() => {
     if (selectedAsset && individualKeys.includes(selectedAsset.name)) {
@@ -185,7 +213,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
       <Card>
         <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">資産推移</h3>
         <div style={{ width: '100%', height: 300 }} className="flex items-center justify-center">
-          <p className="text-gray-500 dark:text-gray-400">{isOldFormat ? "カテゴリ別の履歴データ形式に更新してください。" : "履歴データがありません。"}</p>
+          <p className="text-gray-500 dark:text-gray-400">{isOldFormat ? "カテゴリー別の履歴データ形式に更新してください。" : "履歴データがありません。"}</p>
         </div>
       </Card>
     );
@@ -267,7 +295,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
                 </div>
              ) : (
                  <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-sm rounded-md">
-                     履歴データに個別の銘柄情報が含まれていません。スプレッドシートの履歴シートに銘柄ごとの列を追加すると、ここにグラフが表示されます。
+                     履歴データに個別銘柄の情報が含まれていません。スプレッドシートの履歴シートに銘柄ごとの列を追加すると、ここにグラフが表示されます。
                  </div>
              )}
           </div>
@@ -278,7 +306,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
             {viewMode === 'category' ? (
                 <AreaChart data={processedData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
-                    <XAxis dataKey="date" stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
+                    <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
                     <Tooltip content={<CategoryTooltip />} />
                     <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
@@ -298,7 +326,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
             ) : (
                  <LineChart data={processedData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
-                    <XAxis dataKey="date" stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
+                    <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
                     <Tooltip content={<IndividualTooltip />} />
                     <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
