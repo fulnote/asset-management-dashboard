@@ -147,6 +147,19 @@ const parseSafeDate = (dateStr: string): Date | null => {
   return null;
 };
 
+const parseSafeNumber = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[,¥円\s]/g, '');
+    const num = Number(cleaned);
+    return isNaN(num) ? 0 : num;
+  }
+  
+  return 0;
+};
+
 interface AssetTrendChartProps {
   data: AssetHistoryByCategoryPoint[];
   selectedAsset?: { name: string, timestamp: number } | null;
@@ -176,8 +189,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
 
         // Process all numeric values
         allKeys.forEach(key => {
-            const val = Number(entry[key]);
-            const safeVal = isNaN(val) ? 0 : val;
+            const safeVal = parseSafeNumber(entry[key]);
             newEntry[key] = safeVal;
         });
         
@@ -193,9 +205,9 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
             }
         });
 
-        const marginStocksValue = Number(entry[AssetType.MarginStocks]) || 0;
-        const leveragedFxValue = Number(entry[AssetType.LeveragedFX]) || 0;
-        const liabilityValue = Number(entry[AssetType.Liability]) || 0;
+        const marginStocksValue = parseSafeNumber(entry[AssetType.MarginStocks]);
+        const leveragedFxValue = parseSafeNumber(entry[AssetType.LeveragedFX]);
+        const liabilityValue = parseSafeNumber(entry[AssetType.Liability]);
         
         newEntry[AssetType.Liability] = liabilityValue;
         newEntry['純資産'] = totalPositiveAssets + marginStocksValue + leveragedFxValue + liabilityValue;
@@ -297,7 +309,7 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
     if (individualKeys.length > 0 && selectedIndividualKeys.length === 0) {
         const latestData = processedData[processedData.length - 1];
         if (latestData) {
-            const sortedKeys = individualKeys.sort((a, b) => (Number(latestData[b]) || 0) - (Number(latestData[a]) || 0));
+            const sortedKeys = individualKeys.sort((a, b) => parseSafeNumber(latestData[b]) - parseSafeNumber(latestData[a]));
             setSelectedIndividualKeys(sortedKeys.slice(0, 5));
         } else {
             setSelectedIndividualKeys(individualKeys.slice(0, 5));

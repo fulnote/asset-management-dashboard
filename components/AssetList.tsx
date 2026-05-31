@@ -171,6 +171,8 @@ const AssetRow: React.FC<{asset: Asset; onAssetSelect?: (name: string) => void}>
 
 const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }) => {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [sortKey, setSortKey] = useState<'value' | 'profitOrLoss' | 'profitOrLossRate' | 'name'>('profitOrLoss');
+  const [sortAscending, setSortAscending] = useState<boolean>(true);
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -191,7 +193,7 @@ const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }
         return acc;
     }, initialGroups);
 
-    return Object.entries(groups).map(([groupName, assetsInGroup]) => {
+    const parsedGroups = Object.entries(groups).map(([groupName, assetsInGroup]) => {
         const groupAssets = assetsInGroup as Asset[];
         const totalValue = groupAssets.reduce((sum, a) => sum + a.value, 0);
         const totalProfitOrLoss = groupAssets.reduce((sum, a) => sum + (a.profitOrLoss ?? 0), 0);
@@ -206,12 +208,78 @@ const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }
             totalProfitOrLoss,
             totalProfitOrLossRate
         };
-    }).sort((a, b) => b.totalValue - a.totalValue);
-  }, [assets, grouping]);
+    });
+
+    return parsedGroups.sort((a, b) => {
+        let comparison = 0;
+        if (sortKey === 'value') {
+            comparison = a.totalValue - b.totalValue;
+        } else if (sortKey === 'profitOrLoss') {
+            comparison = a.totalProfitOrLoss - b.totalProfitOrLoss;
+        } else if (sortKey === 'profitOrLossRate') {
+            comparison = a.totalProfitOrLossRate - b.totalProfitOrLossRate;
+        } else if (sortKey === 'name') {
+            comparison = a.groupName.localeCompare(b.groupName, 'ja');
+        }
+        return sortAscending ? comparison : -comparison;
+    });
+  }, [assets, grouping, sortKey, sortAscending]);
+
+  const sortedIndividualAssets = useMemo(() => {
+    if (grouping !== 'individual') return [];
+    
+    return [...assets].sort((a, b) => {
+        let comparison = 0;
+        if (sortKey === 'value') {
+            comparison = a.value - b.value;
+        } else if (sortKey === 'profitOrLoss') {
+            comparison = (a.profitOrLoss ?? 0) - (b.profitOrLoss ?? 0);
+        } else if (sortKey === 'profitOrLossRate') {
+            comparison = (a.profitOrLossRate ?? 0) - (b.profitOrLossRate ?? 0);
+        } else if (sortKey === 'name') {
+            comparison = a.name.localeCompare(b.name, 'ja');
+        }
+        return sortAscending ? comparison : -comparison;
+    });
+  }, [assets, grouping, sortKey, sortAscending]);
+
+  const sortSelector = (
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 mb-4 border-b border-gray-200 dark:border-gray-700 gap-2">
+      <div className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400">
+        表示件数: {grouping === 'individual' ? sortedIndividualAssets.length : groupedAssets?.length ?? 0}件
+      </div>
+      
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <label htmlFor="asset-sort-select" className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+          並び替え:
+        </label>
+        <select
+          id="asset-sort-select"
+          value={`${sortKey}-${sortAscending ? 'asc' : 'desc'}`}
+          onChange={(e) => {
+            const [key, dir] = e.target.value.split('-');
+            setSortKey(key as any);
+            setSortAscending(dir === 'asc');
+          }}
+          className="block w-full sm:w-auto pl-3 pr-8 py-1.5 text-xs sm:text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md cursor-pointer"
+        >
+          <option value="value-desc">評価額の多い順</option>
+          <option value="value-asc">評価額の少ない順</option>
+          <option value="profitOrLoss-desc">評価損益の多い順</option>
+          <option value="profitOrLoss-asc">評価損益の少ない順</option>
+          <option value="profitOrLossRate-desc">評価損益率の高い順</option>
+          <option value="profitOrLossRate-asc">評価損益率の低い順</option>
+          <option value="name-asc">名称順 (昇順)</option>
+          <option value="name-desc">名称順 (降順)</option>
+        </select>
+      </div>
+    </div>
+  );
   
   if (grouping === 'individual' || !groupedAssets) {
       return (
         <Card>
+          {sortSelector}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -222,7 +290,7 @@ const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {assets.map((asset) => (
+                {sortedIndividualAssets.map((asset) => (
                   <AssetRow key={asset.id} asset={asset} onAssetSelect={onAssetSelect} />
                 ))}
               </tbody>
@@ -234,6 +302,7 @@ const AssetList: React.FC<AssetListProps> = ({ assets, grouping, onAssetSelect }
 
   return (
     <Card>
+      {sortSelector}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-700">
