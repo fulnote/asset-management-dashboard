@@ -28,13 +28,29 @@ const INDIVIDUAL_COLORS = [
 const getColorForIndex = (index: number) => INDIVIDUAL_COLORS[index % INDIVIDUAL_COLORS.length];
 
 const formatCurrency = (value: number) => {
-    if (Math.abs(value) >= 100000000) {
-        return `${Math.round(value / 100000000)}億円`;
+    const absValue = Math.abs(value);
+    if (absValue >= 100000000) {
+        const oku = value / 100000000;
+        return `${oku.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}億円`;
     }
-    if (Math.abs(value) >= 10000) {
-        return `${Math.round(value / 10000)}万円`;
+    if (absValue >= 10000) {
+        const man = value / 10000;
+        return `${man.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}万円`;
     }
-    return `${Math.round(value)}円`;
+    return `${value.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}円`;
+};
+
+const formatTooltipDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const cleanStr = dateStr.replace(/-/g, '/').split(/[ T]/)[0];
+  const parts = cleanStr.split('/');
+  if (parts.length >= 3) {
+    const year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const day = parts[2].padStart(2, '0');
+    return `${year}/${month}/${day}`; // 2026/05/31
+  }
+  return dateStr;
 };
 
 const CategoryTooltip = ({ active, payload, label }: any) => {
@@ -46,7 +62,7 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
 
     return (
       <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-50">
-        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">{label}</p>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">{formatTooltipDate(label)}</p>
         <div className="space-y-1 max-h-60 overflow-y-auto">
           {assetPayload.slice().reverse().map((entry: any) => (
              <div key={entry.name} className="flex justify-between items-center text-xs">
@@ -78,7 +94,7 @@ const IndividualTooltip = ({ active, payload, label }: any) => {
 
       return (
         <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-50">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">{label}</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">{formatTooltipDate(label)}</p>
           <div className="space-y-1 max-h-60 overflow-y-auto">
             {sortedPayload.map((entry: any) => (
                <div key={entry.name} className="flex justify-between items-center text-xs">
