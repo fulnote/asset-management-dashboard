@@ -50,7 +50,7 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       // Only send the latest 5 history entries as the prompt only needs those.
       const recentHistory = Array.isArray(historyByCategory) ? historyByCategory.slice(-5) : [];
 
-      const userApiKey = localStorage.getItem('geminiApiKey') || '';
+      const userApiKey = (localStorage.getItem('geminiApiKey') || '').trim();
 
       const response = await fetch('/api/gemini/comment', {
         method: 'POST',
@@ -58,10 +58,21 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
           'Content-Type': 'application/json',
           'x-gemini-api-key': userApiKey,
         },
-        body: JSON.stringify({ assets, historyByCategory: recentHistory }),
+        body: JSON.stringify({ 
+          assets, 
+          historyByCategory: recentHistory,
+          geminiApiKey: userApiKey
+        }),
       });
 
-      const data = await response.json();
+      let data: any = {};
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`サーバーが非JSONレスポンスを返しました (ステータス: ${response.status})。応答の一部: ${text.substring(0, 100)}`);
+      }
 
       if (data.error === 'GEMINI_API_KEY_MISSING') {
         setMissingApiKey(true);
@@ -75,7 +86,7 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       }
     } catch (err: any) {
       console.error('Error fetching AI comment:', err);
-      setError('サーバーとの通信に失敗しました。時間をおいて再度お試しください。');
+      setError(`サーバーとの通信に失敗しました。詳細: ${err.message || err}`);
     } finally {
       setLoading(false);
     }

@@ -18,7 +18,10 @@ async function startServer() {
   // AI Comment generation endpoint
   app.post("/api/gemini/comment", async (req, res) => {
     const headerApiKey = req.headers['x-gemini-api-key'] as string | undefined;
-    const apiKey = (headerApiKey && headerApiKey.trim()) || process.env.GEMINI_API_KEY;
+    const { assets, historyByCategory, geminiApiKey } = req.body;
+    
+    const rawApiKey = (geminiApiKey as string | undefined) || headerApiKey;
+    const apiKey = (rawApiKey && rawApiKey.trim()) || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return res.status(200).json({
@@ -26,8 +29,6 @@ async function startServer() {
         message: "AIコメントを表示するには、設定画面でご自身の「Gemini APIキー」を入力するか、AI Studioの「Settings > Secrets」パネルで「GEMINI_API_KEY」を設定してください。"
       });
     }
-
-    const { assets, historyByCategory } = req.body;
 
     if (!assets || !Array.isArray(assets) || assets.length === 0) {
       return res.status(400).json({
