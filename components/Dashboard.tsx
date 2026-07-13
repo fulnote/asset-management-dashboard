@@ -6,6 +6,7 @@ import AssetTrendChart from './AssetTrendChart';
 import AssetBreakdownChart from './AssetBreakdownChart';
 import AssetList from './AssetList';
 import MonthlyReport from './MonthlyReport';
+import AiComment from './AiComment';
 
 interface DashboardProps {
   totalAssets: number;
@@ -46,6 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           isProfitLossCard={true} 
         />
       </div>
+
+      <AiComment assets={assets} historyByCategory={assetHistory} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

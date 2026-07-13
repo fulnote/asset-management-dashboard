@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { AssetHistoryByCategoryPoint, AssetType } from '../types';
 import Card from './Card';
 import { ChevronDownIcon } from './IconComponents';
@@ -59,6 +59,10 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
     
     // Sum only the displayed components for the "Total" in tooltip to match visual stack
     const totalDisplayed = assetPayload.reduce((sum: number, p: any) => sum + (Number(p.value) || 0), 0);
+    
+    // Find the '純資産' (Net Worth) value in payload
+    const netWorthPayload = payload.find((p: any) => p.dataKey === '純資産');
+    const netWorthValue = netWorthPayload ? Number(netWorthPayload.value) : 0;
 
     return (
       <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-50">
@@ -76,10 +80,16 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
         </div>
         
         <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
-            <div className="flex justify-between items-center text-sm font-bold">
+            <div className="flex justify-between items-center text-sm font-bold mb-1">
                 <span className="text-gray-800 dark:text-gray-200">現物資産合計:</span>
                 <span className="text-gray-900 dark:text-gray-100 font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(totalDisplayed)}円</span>
             </div>
+            {netWorthPayload && Math.abs(totalDisplayed - netWorthValue) > 1 && (
+                <div className="flex justify-between items-center text-sm font-bold text-orange-600 dark:text-orange-400 border-t border-dashed border-gray-200 dark:border-gray-600 pt-1.5 mt-1.5">
+                    <span>純資産 (右軸):</span>
+                    <span className="font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(netWorthValue)}円</span>
+                </div>
+            )}
         </div>
       </div>
     );
@@ -168,7 +178,7 @@ interface AssetTrendChartProps {
 const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }) => {
   type TimeRange = '1M' | '3M' | '6M' | '1Y' | 'YTD' | 'ALL';
   const [viewMode, setViewMode] = useState<'category' | 'individual'>('category');
-  const [timeRange, setTimeRange] = useState<TimeRange>('ALL');
+  const [timeRange, setTimeRange] = useState<TimeRange>('3M');
   const [selectedIndividualKeys, setSelectedIndividualKeys] = useState<string[]>([]);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
@@ -440,10 +450,11 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
       <div style={{ width: '100%', height: 300 }}>
         <ResponsiveContainer>
             {viewMode === 'category' ? (
-                <AreaChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <ComposedChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
                     <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
-                    <YAxis tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
+                    <YAxis yAxisId="left" tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
+                    <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
                     <Tooltip content={<CategoryTooltip />} />
                     <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     
@@ -452,13 +463,24 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
                             key={key}
                             type="monotone"
                             dataKey={key}
+                            yAxisId="left"
                             stackId="positiveAssets"
                             stroke={CATEGORY_COLORS[key] || '#8884d8'}
                             fill={CATEGORY_COLORS[key] || '#8884d8'}
                             name={key}
                         />
                     ))}
-                </AreaChart>
+                    <Line
+                        type="monotone"
+                        dataKey="純資産"
+                        yAxisId="right"
+                        stroke="#FF5722"
+                        strokeWidth={3}
+                        dot={{ r: 1 }}
+                        activeDot={{ r: 4 }}
+                        name="純資産 (右軸)"
+                    />
+                </ComposedChart>
             ) : (
                  <LineChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
