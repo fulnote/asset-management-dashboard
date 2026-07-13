@@ -74,7 +74,10 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
           data = await response.json();
         } else {
           const text = await response.text();
-          throw new Error(`404_OR_NON_JSON:${response.status}:${text.substring(0, 100)}`);
+          if (response.status === 404) {
+            throw new Error("静的ホスティング環境（Netlify等）ではバックエンドのExpressサーバー（server.ts）が起動しないため、AIアドバイス機能をご利用いただけません。AI Studioのプレビュー環境、またはサーバーが稼働するフルスタック環境（Cloud Runなど）で実行してください。");
+          }
+          throw new Error(`エラー (${response.status}): ${text.substring(0, 100)}`);
         }
 
         if (data.error === 'GEMINI_API_KEY_MISSING') {
@@ -87,120 +90,8 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
           throw new Error(data.message || 'AIコメントの取得に失敗しました。');
         }
       } catch (backendErr: any) {
-        console.warn('Backend comment API failed, trying client-side fallback if API key is available:', backendErr);
-
-        // If the backend failed (such as returning a 404 on Netlify static deployment)
-        // and the user has configured their custom API key, execute the call directly in the browser.
-        if (userApiKey) {
-          try {
-            const formattedAssets = assets.map((a: Asset) => {
-              const valueStr = new Intl.NumberFormat('ja-JP').format(a.value);
-              const plStr = a.profitOrLoss !== undefined 
-                ? `, 損益: ${new Intl.NumberFormat('ja-JP').format(a.profitOrLoss)}円 (${(a.profitOrLossRate * 100).toFixed(2)}%)`
-                : '';
-              return `- ${a.name} (種類: ${a.type}, 評価額: ${valueStr}円${plStr})`;
-            }).join('\n');
-
-            const formattedHistory = recentHistory.map((h: any) => {
-              const dateStr = h.date || '';
-              const netWorth = h['純資産'] !== undefined 
-                ? `${new Intl.NumberFormat('ja-JP').format(h['純資産'])}円` 
-                : '不明';
-              return `- 日付: ${dateStr}, 純資産: ${netWorth}`;
-            }).join('\n');
-
-            const clientPrompt = `【役割定義・システム指示】
-あなたは非常に優秀で親しみやすいファイナンシャル・プラナー（CFP）および投資アドバイザーです。客観的かつ論理的な数値データ分析に基づき、実用的で安心感のある財務診断コメントを日本語で提供します。
-
-以下のユーザーの現在のアセットポートフォリオと最近の純資産推移データに基づいて、客観的かつプロフェッショナルな財務状況の分析とアドバイス（日本語）を生成してください。
-
-### 現在の資産内訳:
-${formattedAssets}
-
-### 最近の資産推移 (最新5件):
-${formattedHistory}
-
-### 指示:
-1. 現在の資産ポートフォリオのバランス（現金の比率、株式や暗号資産などのリスク資産の比率、負債の状況など）について評価してください。
-2. 資産の最近の増減傾向や、個別銘柄・カテゴリー別の損益（好調なアセットや、改善が必要なアセット）についてコメントしてください。
-3. 今後の運用アドバイス（ポートフォリオのバランス調整、リスク管理の観点など）を、簡潔な2〜3の具体的なアクションプランを含めて提案してください。
-4. 全体として読みやすく、説得力があり、専門的で前向きなトーンにしてください。
-5. 出力は標準的なMarkdown形式で記述してください（見出し、リスト、太字などを効果的に使用）。`;
-
-            // Try different API versions and model names sequentially to maximize compatibility
-            const candidates = [
-              { version: 'v1', model: 'gemini-1.5-flash' },
-              { version: 'v1beta', model: 'gemini-1.5-flash' },
-              { version: 'v1beta', model: 'gemini-2.5-flash' },
-              { version: 'v1', model: 'gemini-2.5-flash' },
-              { version: 'v1beta', model: 'gemini-1.5-pro' }
-            ];
-
-            let textResult = '';
-            let lastClientErr = '';
-
-            for (const cand of candidates) {
-              try {
-                const url = `https://generativelanguage.googleapis.com/${cand.version}/models/${cand.model}:generateContent?key=${encodeURIComponent(userApiKey)}`;
-                const clientResponse = await fetch(url, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    contents: [
-                      {
-                        parts: [
-                          {
-                            text: clientPrompt
-                          }
-                        ]
-                      }
-                    ],
-                    generationConfig: {
-                      temperature: 0.7,
-                    }
-                  })
-                });
-
-                if (clientResponse.ok) {
-                  const clientData = await clientResponse.json();
-                  const txt = clientData.candidates?.[0]?.content?.parts?.[0]?.text;
-                  if (txt) {
-                    textResult = txt;
-                    break;
-                  }
-                } else {
-                  const errText = await clientResponse.text();
-                  let errDetail = `HTTP ${clientResponse.status}`;
-                  try {
-                    const errJson = JSON.parse(errText);
-                    errDetail = errJson.error?.message || errDetail;
-                  } catch (_) {}
-                  lastClientErr = `${cand.model} (${cand.version}) 失敗: ${errDetail}`;
-                }
-              } catch (e: any) {
-                lastClientErr = `${cand.model} (${cand.version}) 通信エラー: ${e.message || e}`;
-              }
-            }
-
-            if (!textResult) {
-              throw new Error(`全モデルの直接呼び出しが失敗しました。最後の詳細: ${lastClientErr}`);
-            }
-
-            commentText = textResult;
-          } catch (clientErr: any) {
-            throw new Error(`[サーバーエラー]: ${backendErr.message}\n[クライアント側フォールバックエラー]: ${clientErr.message}`);
-          }
-        } else {
-          // If no custom API key is available and the backend gave a 404 (e.g. Netlify)
-          if (backendErr.message.includes('404_OR_NON_JSON')) {
-            setMissingApiKey(true);
-            setComment(null);
-            return;
-          }
-          throw backendErr;
-        }
+        console.error('API call failed:', backendErr);
+        throw backendErr;
       }
 
       if (commentText) {
