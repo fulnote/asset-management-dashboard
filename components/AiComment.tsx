@@ -124,52 +124,72 @@ ${formattedHistory}
 4. 全体として読みやすく、説得力があり、専門的で前向きなトーンにしてください。
 5. 出力は標準的なMarkdown形式で記述してください（見出し、リスト、太字などを効果的に使用）。`;
 
-            // Try using gemini-1.5-flash for maximum compatibility and speed
-            const modelName = 'gemini-1.5-flash';
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(userApiKey)}`;
+            // Try different API versions and model names sequentially to maximize compatibility
+            const candidates = [
+              { version: 'v1', model: 'gemini-1.5-flash' },
+              { version: 'v1beta', model: 'gemini-1.5-flash' },
+              { version: 'v1beta', model: 'gemini-2.5-flash' },
+              { version: 'v1', model: 'gemini-2.5-flash' },
+              { version: 'v1beta', model: 'gemini-1.5-pro' }
+            ];
 
-            const clientResponse = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: clientPrompt
-                      }
-                    ]
-                  }
-                ],
-                systemInstruction: {
-                  parts: [
-                    {
-                      text: "あなたは非常に優秀で親しみやすいファイナンシャル・プラナー（CFP）および投資アドバイザーです。客観的かつ論理的な数値データ分析に基づき、実用的で安心感のある財務診断コメントを日本語で提供します。"
-                    }
-                  ]
-                },
-                generationConfig: {
-                  temperature: 0.7,
-                }
-              })
-            });
+            let textResult = '';
+            let lastClientErr = '';
 
-            if (!clientResponse.ok) {
-              const errText = await clientResponse.text();
-              let errDetail = `HTTP ${clientResponse.status}`;
+            for (const cand of candidates) {
               try {
-                const errJson = JSON.parse(errText);
-                errDetail = errJson.error?.message || errDetail;
-              } catch (_) {}
-              throw new Error(`Gemini API直接呼び出し失敗: ${errDetail}`);
+                const url = `https://generativelanguage.googleapis.com/${cand.version}/models/${cand.model}:generateContent?key=${encodeURIComponent(userApiKey)}`;
+                const clientResponse = await fetch(url, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    contents: [
+                      {
+                        parts: [
+                          {
+                            text: clientPrompt
+                          }
+                        ]
+                      }
+                    ],
+                    systemInstruction: {
+                      parts: [
+                        {
+                          text: "あなたは非常に優秀で親しみやすいファイナンシャル・プラナー（CFP）および投資アドバイザーです。客観的かつ論理的な数値データ分析に基づき、実用的で安心感のある財務診断コメントを日本語で提供します。"
+                        }
+                      ]
+                    },
+                    generationConfig: {
+                      temperature: 0.7,
+                    }
+                  })
+                });
+
+                if (clientResponse.ok) {
+                  const clientData = await clientResponse.json();
+                  const txt = clientData.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (txt) {
+                    textResult = txt;
+                    break;
+                  }
+                } else {
+                  const errText = await clientResponse.text();
+                  let errDetail = `HTTP ${clientResponse.status}`;
+                  try {
+                    const errJson = JSON.parse(errText);
+                    errDetail = errJson.error?.message || errDetail;
+                  } catch (_) {}
+                  lastClientErr = `${cand.model} (${cand.version}) 失敗: ${errDetail}`;
+                }
+              } catch (e: any) {
+                lastClientErr = `${cand.model} (${cand.version}) 通信エラー: ${e.message || e}`;
+              }
             }
 
-            const clientData = await clientResponse.json();
-            const textResult = clientData.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!textResult) {
-              throw new Error('Gemini APIからの返答が空でした。');
+              throw new Error(`全モデルの直接呼び出しが失敗しました。最後の詳細: ${lastClientErr}`);
             }
 
             commentText = textResult;
