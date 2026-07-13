@@ -3,10 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { WalletIcon } from './IconComponents';
 
 interface UrlSetupProps {
-  onSettingsSubmit: (scriptUrl: string, sheetUrl: string, geminiApiKey: string) => void;
+  onSettingsSubmit: (scriptUrl: string, sheetUrl: string) => void;
   initialScriptUrl?: string;
   initialSheetUrl?: string;
-  initialGeminiApiKey?: string;
   onCancel?: () => void;
 }
 
@@ -14,23 +13,20 @@ const UrlSetup: React.FC<UrlSetupProps> = ({
   onSettingsSubmit, 
   initialScriptUrl = '', 
   initialSheetUrl = '', 
-  initialGeminiApiKey = '', 
   onCancel 
 }) => {
   const [url, setUrl] = useState(initialScriptUrl);
   const [sheetUrl, setSheetUrl] = useState(initialSheetUrl);
-  const [geminiApiKey, setGeminiApiKey] = useState(initialGeminiApiKey);
 
   useEffect(() => {
     setUrl(initialScriptUrl);
     setSheetUrl(initialSheetUrl);
-    setGeminiApiKey(initialGeminiApiKey);
-  }, [initialScriptUrl, initialSheetUrl, initialGeminiApiKey]);
+  }, [initialScriptUrl, initialSheetUrl]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (url.trim()) {
-      onSettingsSubmit(url.trim(), sheetUrl.trim(), geminiApiKey.trim());
+      onSettingsSubmit(url.trim(), sheetUrl.trim());
     }
   };
 
@@ -103,35 +99,7 @@ const UrlSetup: React.FC<UrlSetupProps> = ({
             </div>
           </div>
 
-          <div>
-            <label htmlFor="gemini-api-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Gemini APIキー (任意 - AI資産アドバイス用)
-            </label>
-            <div className="mt-1">
-              <input
-                id="gemini-api-key"
-                name="geminiApiKey"
-                type="password"
-                className="block w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
-                placeholder="AIコメント機能を利用する場合に入力（ご自身のブラウザのみに安全に保存されます）"
-                value={geminiApiKey}
-                onChange={(e) => setGeminiApiKey(e.target.value)}
-                aria-label="Gemini APIキー"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                ご自身のAPIキーを入力すると、管理者の代わりにあなたのアカウント料金でGemini APIを実行します。キーは外部サーバーには保存されず、ブラウザのローカルストレージのみに保管されます。
-              </p>
-              {geminiApiKey && !geminiApiKey.startsWith('AIzaSy') && !geminiApiKey.startsWith('AQ.') && (
-                <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded text-xs text-red-600 dark:text-red-400">
-                  <p className="font-semibold">⚠️ APIキーの形式が異なっている可能性があります</p>
-                  <p className="mt-0.5 leading-relaxed">
-                    Google AI Studioで取得したGemini用のAPIキーは、通常 <strong>「AIzaSy」</strong> または <strong>「AQ.」</strong> から始まります。
-                    お使いのキーが正しいか、もう一度ご確認ください。
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+
 
           <div className="flex gap-4">
             {onCancel && (

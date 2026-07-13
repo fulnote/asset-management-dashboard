@@ -20,10 +20,6 @@ const App: React.FC = () => {
     return localStorage.getItem('spreadsheetUrl');
   });
 
-  const [geminiApiKey, setGeminiApiKey] = useState<string | null>(() => {
-    return localStorage.getItem('geminiApiKey');
-  });
-
   useEffect(() => {
     if (googleScriptUrl) {
       localStorage.setItem('googleScriptUrl', googleScriptUrl);
@@ -39,14 +35,6 @@ const App: React.FC = () => {
       localStorage.removeItem('spreadsheetUrl');
     }
   }, [spreadsheetUrl]);
-
-  useEffect(() => {
-    if (geminiApiKey) {
-      localStorage.setItem('geminiApiKey', geminiApiKey);
-    } else {
-      localStorage.removeItem('geminiApiKey');
-    }
-  }, [geminiApiKey]);
 
   const fetchData = useCallback(async () => {
     if (!googleScriptUrl) {
@@ -139,10 +127,9 @@ const App: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleSettingsSubmit = (scriptUrl: string, sheetUrl: string, apiKey: string) => {
+  const handleSettingsSubmit = (scriptUrl: string, sheetUrl: string) => {
     setGoogleScriptUrl(scriptUrl);
     setSpreadsheetUrl(sheetUrl);
-    setGeminiApiKey(apiKey);
     setIsConfiguring(false);
   };
 
@@ -213,7 +200,6 @@ const App: React.FC = () => {
             onSettingsSubmit={handleSettingsSubmit} 
             initialScriptUrl={googleScriptUrl || ''}
             initialSheetUrl={spreadsheetUrl || ''}
-            initialGeminiApiKey={geminiApiKey || ''}
             onCancel={googleScriptUrl ? handleCancelConfig : undefined}
         />
     );

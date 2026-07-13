@@ -32,7 +32,6 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
   const [comment, setComment] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [missingApiKey, setMissingApiKey] = useState(false);
 
   // Simple fingerprint of the assets to detect changes
   const assetsFingerprint = JSON.stringify(
@@ -44,60 +43,42 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
 
     setLoading(true);
     setError(null);
-    setMissingApiKey(false);
 
     try {
       // Only send the latest 5 history entries as the prompt only needs those.
       const recentHistory = Array.isArray(historyByCategory) ? historyByCategory.slice(-5) : [];
 
-      const userApiKey = (localStorage.getItem('geminiApiKey') || '').trim();
+      const response = await fetch('/.netlify/functions/gemini-comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          assets, 
+          historyByCategory: recentHistory,
+        }),
+      });
 
-      let commentText = '';
-
-      try {
-        const response = await fetch('/api/gemini/comment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-gemini-api-key': userApiKey,
-          },
-          body: JSON.stringify({ 
-            assets, 
-            historyByCategory: recentHistory,
-            geminiApiKey: userApiKey
-          }),
-        });
-
-        let data: any = {};
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          data = await response.json();
-        } else {
-          const text = await response.text();
-          if (response.status === 404) {
-            throw new Error("静的ホスティング環境（Netlify等）ではバックエンドのExpressサーバー（server.ts）が起動しないため、AIアドバイス機能をご利用いただけません。AI Studioのプレビュー環境、またはサーバーが稼働するフルスタック環境（Cloud Runなど）で実行してください。");
-          }
-          throw new Error(`エラー (${response.status}): ${text.substring(0, 100)}`);
-        }
-
-        if (data.error === 'GEMINI_API_KEY_MISSING') {
-          setMissingApiKey(true);
-          setComment(null);
-          return;
-        } else if (response.ok && data.comment) {
-          commentText = data.comment;
-        } else {
-          throw new Error(data.message || 'AIコメントの取得に失敗しました。');
-        }
-      } catch (backendErr: any) {
-        console.error('API call failed:', backendErr);
-        throw backendErr;
+      let data: any = {};
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`エラー (${response.status}): ${text.substring(0, 100)}`);
       }
 
-      if (commentText) {
+      if (data.error === 'GEMINI_API_KEY_MISSING') {
+        setError("Netlifyの「Environment Variables」設定画面で GEMINI_API_KEY を設定してください。");
+        setComment(null);
+        return;
+      } else if (response.ok && data.comment) {
+        const commentText = data.comment;
         setComment(commentText);
         localStorage.setItem('cached_ai_comment', commentText);
         localStorage.setItem('cached_ai_comment_fingerprint', assetsFingerprint);
+      } else {
+        throw new Error(data.message || 'AIコメントの取得に失敗しました。');
       }
     } catch (err: any) {
       console.error('Error fetching AI comment:', err);
@@ -160,37 +141,9 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
         </div>
       )}
 
-      {missingApiKey && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
-          <h4 className="font-bold text-yellow-800 dark:text-yellow-300 text-sm mb-1">Gemini APIキーの設定が必要です</h4>
-          <p className="text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed mb-2">
-            AIコメントを表示するには、以下のいずれかの方法で <strong>Gemini APIキー</strong> を設定してください：
-          </p>
-          <ul className="list-disc list-inside text-xs text-yellow-700 dark:text-yellow-400 space-y-1 ml-1 mb-3">
-            <li>画面上部ヘッダーの <strong>「設定ボタン（歯車アイコン）」</strong> をクリックし、表示される <strong>「Gemini APIキー」</strong> 欄に入力する（推奨：ブラウザのみに安全に保存されます）</li>
-            <li>または、管理者がAI Studioの「Settings &gt; Secrets」パネルで <strong>GEMINI_API_KEY</strong> を設定する</li>
-          </ul>
-          <button
-            onClick={() => fetchAiComment(true)}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
-          >
-            設定完了後に再試行
-          </button>
-        </div>
-      )}
-
-      {error && !comment && !missingApiKey && (
+      {error && !comment && (
         <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg flex flex-col items-start gap-2">
           <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed">{error}</p>
-          {localStorage.getItem('geminiApiKey') && !localStorage.getItem('geminiApiKey')?.startsWith('AIzaSy') && !localStorage.getItem('geminiApiKey')?.startsWith('AQ.') && (
-            <div className="w-full mt-1 p-2 bg-red-100/50 dark:bg-red-950/40 rounded border border-red-200/50 dark:border-red-900/40 text-xs text-red-700 dark:text-red-300">
-              <p className="font-semibold">💡 APIキーの確認:</p>
-              <p className="mt-0.5 leading-relaxed">
-                現在設定されているキーが <strong>「AIzaSy」</strong> または <strong>「AQ.」</strong> で始まっていません。
-                Google AI StudioやGoogle Cloudで <strong>「Get API key」</strong> をクリックして取得した、有効なAPIキー（通常は「AIzaSy」または「AQ.」で始まる）をご入力ください。
-              </p>
-            </div>
-          )}
           <button
             onClick={() => fetchAiComment(true)}
             className="px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
