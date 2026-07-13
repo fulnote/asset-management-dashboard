@@ -156,6 +156,15 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       {error && !comment && !missingApiKey && (
         <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg flex flex-col items-start gap-2">
           <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed">{error}</p>
+          {localStorage.getItem('geminiApiKey') && !localStorage.getItem('geminiApiKey')?.startsWith('AIzaSy') && !localStorage.getItem('geminiApiKey')?.startsWith('AQ.') && (
+            <div className="w-full mt-1 p-2 bg-red-100/50 dark:bg-red-950/40 rounded border border-red-200/50 dark:border-red-900/40 text-xs text-red-700 dark:text-red-300">
+              <p className="font-semibold">💡 APIキーの確認:</p>
+              <p className="mt-0.5 leading-relaxed">
+                現在設定されているキーが <strong>「AIzaSy」</strong> または <strong>「AQ.」</strong> で始まっていません。
+                Google AI StudioやGoogle Cloudで <strong>「Get API key」</strong> をクリックして取得した、有効なAPIキー（通常は「AIzaSy」または「AQ.」で始まる）をご入力ください。
+              </p>
+            </div>
+          )}
           <button
             onClick={() => fetchAiComment(true)}
             className="px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"

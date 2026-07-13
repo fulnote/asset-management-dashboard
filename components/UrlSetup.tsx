@@ -121,6 +121,15 @@ const UrlSetup: React.FC<UrlSetupProps> = ({
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 ご自身のAPIキーを入力すると、管理者の代わりにあなたのアカウント料金でGemini APIを実行します。キーは外部サーバーには保存されず、ブラウザのローカルストレージのみに保管されます。
               </p>
+              {geminiApiKey && !geminiApiKey.startsWith('AIzaSy') && !geminiApiKey.startsWith('AQ.') && (
+                <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded text-xs text-red-600 dark:text-red-400">
+                  <p className="font-semibold">⚠️ APIキーの形式が異なっている可能性があります</p>
+                  <p className="mt-0.5 leading-relaxed">
+                    Google AI Studioで取得したGemini用のAPIキーは、通常 <strong>「AIzaSy」</strong> または <strong>「AQ.」</strong> から始まります。
+                    お使いのキーが正しいか、もう一度ご確認ください。
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
