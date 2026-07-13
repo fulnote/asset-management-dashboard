@@ -3,25 +3,34 @@ import React, { useState, useEffect } from 'react';
 import { WalletIcon } from './IconComponents';
 
 interface UrlSetupProps {
-  onSettingsSubmit: (scriptUrl: string, sheetUrl: string) => void;
+  onSettingsSubmit: (scriptUrl: string, sheetUrl: string, geminiApiKey: string) => void;
   initialScriptUrl?: string;
   initialSheetUrl?: string;
+  initialGeminiApiKey?: string;
   onCancel?: () => void;
 }
 
-const UrlSetup: React.FC<UrlSetupProps> = ({ onSettingsSubmit, initialScriptUrl = '', initialSheetUrl = '', onCancel }) => {
+const UrlSetup: React.FC<UrlSetupProps> = ({ 
+  onSettingsSubmit, 
+  initialScriptUrl = '', 
+  initialSheetUrl = '', 
+  initialGeminiApiKey = '', 
+  onCancel 
+}) => {
   const [url, setUrl] = useState(initialScriptUrl);
   const [sheetUrl, setSheetUrl] = useState(initialSheetUrl);
+  const [geminiApiKey, setGeminiApiKey] = useState(initialGeminiApiKey);
 
   useEffect(() => {
     setUrl(initialScriptUrl);
     setSheetUrl(initialSheetUrl);
-  }, [initialScriptUrl, initialSheetUrl]);
+    setGeminiApiKey(initialGeminiApiKey);
+  }, [initialScriptUrl, initialSheetUrl, initialGeminiApiKey]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (url.trim()) {
-      onSettingsSubmit(url.trim(), sheetUrl.trim());
+      onSettingsSubmit(url.trim(), sheetUrl.trim(), geminiApiKey.trim());
     }
   };
 
@@ -90,6 +99,27 @@ const UrlSetup: React.FC<UrlSetupProps> = ({ onSettingsSubmit, initialScriptUrl 
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 設定すると、画面上部のボタンからシートを直接開けるようになります。
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="gemini-api-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Gemini APIキー (任意 - AI資産アドバイス用)
+            </label>
+            <div className="mt-1">
+              <input
+                id="gemini-api-key"
+                name="geminiApiKey"
+                type="password"
+                className="block w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
+                placeholder="AIコメント機能を利用する場合に入力（ご自身のブラウザのみに安全に保存されます）"
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
+                aria-label="Gemini APIキー"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                ご自身のAPIキーを入力すると、管理者の代わりにあなたのアカウント料金でGemini APIを実行します。キーは外部サーバーには保存されず、ブラウザのローカルストレージのみに保管されます。
               </p>
             </div>
           </div>

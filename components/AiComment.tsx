@@ -50,10 +50,13 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       // Only send the latest 5 history entries as the prompt only needs those.
       const recentHistory = Array.isArray(historyByCategory) ? historyByCategory.slice(-5) : [];
 
+      const userApiKey = localStorage.getItem('geminiApiKey') || '';
+
       const response = await fetch('/api/gemini/comment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-gemini-api-key': userApiKey,
         },
         body: JSON.stringify({ assets, historyByCategory: recentHistory }),
       });
@@ -133,14 +136,17 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
 
       {missingApiKey && (
         <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
-          <h4 className="font-bold text-yellow-800 dark:text-yellow-300 text-sm mb-1">AI機能の設定が必要です</h4>
-          <p className="text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed">
-            AIコメントを表示するには、AI Studio画面の右上またはメニューの <strong>「Settings &gt; Secrets」</strong> から、
-            <strong>GEMINI_API_KEY</strong> という名前でAPIキーを設定してください。
+          <h4 className="font-bold text-yellow-800 dark:text-yellow-300 text-sm mb-1">Gemini APIキーの設定が必要です</h4>
+          <p className="text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed mb-2">
+            AIコメントを表示するには、以下のいずれかの方法で <strong>Gemini APIキー</strong> を設定してください：
           </p>
+          <ul className="list-disc list-inside text-xs text-yellow-700 dark:text-yellow-400 space-y-1 ml-1 mb-3">
+            <li>画面上部ヘッダーの <strong>「設定ボタン（歯車アイコン）」</strong> をクリックし、表示される <strong>「Gemini APIキー」</strong> 欄に入力する（推奨：ブラウザのみに安全に保存されます）</li>
+            <li>または、管理者がAI Studioの「Settings &gt; Secrets」パネルで <strong>GEMINI_API_KEY</strong> を設定する</li>
+          </ul>
           <button
             onClick={() => fetchAiComment(true)}
-            className="mt-3 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
           >
             設定完了後に再試行
           </button>
