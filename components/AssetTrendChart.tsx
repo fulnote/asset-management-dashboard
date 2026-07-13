@@ -40,6 +40,14 @@ const formatCurrency = (value: number) => {
     return `${value.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}円`;
 };
 
+const formatChangeCurrency = (value: number) => {
+    const formatted = formatCurrency(value);
+    if (value > 0) {
+        return `+${formatted}`;
+    }
+    return formatted;
+};
+
 const formatTooltipDate = (dateStr: string) => {
   if (!dateStr) return '';
   const cleanStr = dateStr.replace(/-/g, '/').split(/[ T]/)[0];
@@ -55,14 +63,15 @@ const formatTooltipDate = (dateStr: string) => {
 
 const CategoryTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const assetPayload = payload.filter((p: any) => p.dataKey !== '純資産' && p.dataKey !== AssetType.Liability);
+    const assetPayload = payload.filter((p: any) => p.dataKey !== '純資産' && p.dataKey !== '純資産変動' && p.dataKey !== AssetType.Liability);
     
     // Sum only the displayed components for the "Total" in tooltip to match visual stack
     const totalDisplayed = assetPayload.reduce((sum: number, p: any) => sum + (Number(p.value) || 0), 0);
     
-    // Find the '純資産' (Net Worth) value in payload
-    const netWorthPayload = payload.find((p: any) => p.dataKey === '純資産');
-    const netWorthValue = netWorthPayload ? Number(netWorthPayload.value) : 0;
+    // Retrieve original raw data values from payload[0].payload
+    const rawDataPoint = payload[0]?.payload;
+    const netWorthValue = rawDataPoint ? Number(rawDataPoint['純資産']) : 0;
+    const changeValue = rawDataPoint ? Number(rawDataPoint['純資産変動']) : 0;
 
     return (
       <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-50">
@@ -84,10 +93,18 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
                 <span className="text-gray-800 dark:text-gray-200">現物資産合計:</span>
                 <span className="text-gray-900 dark:text-gray-100 font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(totalDisplayed)}円</span>
             </div>
-            {netWorthPayload && Math.abs(totalDisplayed - netWorthValue) > 1 && (
-                <div className="flex justify-between items-center text-sm font-bold text-orange-600 dark:text-orange-400 border-t border-dashed border-gray-200 dark:border-gray-600 pt-1.5 mt-1.5">
-                    <span>純資産 (右軸):</span>
-                    <span className="font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(netWorthValue)}円</span>
+            {rawDataPoint && (
+                <div className="flex flex-col border-t border-dashed border-gray-200 dark:border-gray-600 pt-1.5 mt-1.5 gap-1">
+                    <div className="flex justify-between items-center text-sm font-bold text-gray-800 dark:text-gray-200">
+                        <span>純資産:</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-mono tabular-nums">{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(netWorthValue)}円</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm font-bold text-orange-600 dark:text-orange-400">
+                        <span>純資産変動 (右軸):</span>
+                        <span className="font-mono tabular-nums">
+                            {changeValue > 0 ? '+' : ''}{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(changeValue)}円
+                        </span>
+                    </div>
                 </div>
             )}
         </div>
@@ -273,6 +290,16 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
     }
   }, [processedData, timeRange]);
 
+  // Compute fluctuation (variation) relative to the start of the selected period
+  const chartData = useMemo(() => {
+    if (filteredData.length === 0) return [];
+    const firstNetWorth = filteredData[0]['純資産'] as number ?? 0;
+    return filteredData.map(d => ({
+      ...d,
+      純資産変動: (d['純資産'] as number ?? 0) - firstNetWorth,
+    }));
+  }, [filteredData]);
+
   const formatXAxisDate = (dateStr: string) => {
     if (!dateStr) return '';
     const cleanStr = dateStr.replace(/-/g, '/').split(/[ T]/)[0];
@@ -450,11 +477,11 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
       <div style={{ width: '100%', height: 300 }}>
         <ResponsiveContainer>
             {viewMode === 'category' ? (
-                <ComposedChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
                     <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis yAxisId="left" tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
-                    <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
+                    <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tickFormatter={formatChangeCurrency} stroke="rgb(156 163 175)" fontSize={12} />
                     <Tooltip content={<CategoryTooltip />} />
                     <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     
@@ -472,17 +499,17 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
                     ))}
                     <Line
                         type="monotone"
-                        dataKey="純資産"
+                        dataKey="純資産変動"
                         yAxisId="right"
                         stroke="#FF5722"
                         strokeWidth={3}
                         dot={{ r: 1 }}
                         activeDot={{ r: 4 }}
-                        name="純資産 (右軸)"
+                        name="純資産変動 (右軸)"
                     />
                 </ComposedChart>
             ) : (
-                 <LineChart data={filteredData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                 <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
                     <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
