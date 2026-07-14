@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Asset, AssetHistoryByCategoryPoint } from '../types';
 import Card from './Card';
 import { RefreshIcon } from './IconComponents';
@@ -48,7 +49,7 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       // Only send the latest 5 history entries as the prompt only needs those.
       const recentHistory = Array.isArray(historyByCategory) ? historyByCategory.slice(-5) : [];
 
-      const response = await fetch('/.netlify/functions/gemini-comment', {
+      const response = await fetch('/api/gemini/comment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       }
 
       if (data.error === 'GEMINI_API_KEY_MISSING') {
-        setError("Netlifyの「Environment Variables」設定画面で GEMINI_API_KEY を設定してください。");
+        setError("Renderの「Environment Variables」設定画面で GEMINI_API_KEY を設定してください。");
         setComment(null);
         return;
       } else if (response.ok && data.comment) {
@@ -118,8 +119,8 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
             <SparklesIcon className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 dark:text-gray-100">AI資産アドバイス</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Geminiがあなたのポートフォリオを自動分析します</p>
+            <h3 className="font-bold text-gray-800 dark:text-gray-100">AI長期資産形成アドバイス</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">ポートフォリオ構造と年初来比の推移から、長期的な運用方針を診断します</p>
           </div>
         </div>
 
@@ -156,6 +157,7 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
       {comment && (
         <div className={`prose dark:prose-invert max-w-none text-sm text-gray-700 dark:text-gray-300 space-y-2 leading-relaxed ${loading ? 'opacity-50' : ''}`}>
           <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             components={{
               h1: ({node, ...props}) => <h4 className="font-bold text-base text-gray-900 dark:text-white mt-4 mb-2 first:mt-0" {...props} />,
               h2: ({node, ...props}) => <h4 className="font-bold text-sm text-gray-900 dark:text-white mt-3 mb-1.5" {...props} />,
@@ -166,6 +168,16 @@ const AiComment: React.FC<AiCommentProps> = ({ assets, historyByCategory }) => {
               li: ({node, ...props}) => <li className="text-gray-600 dark:text-gray-400" {...props} />,
               strong: ({node, ...props}) => <strong className="font-bold text-gray-900 dark:text-white" {...props} />,
               blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic my-2 text-gray-500 dark:text-gray-400" {...props} />,
+              table: ({node, ...props}) => (
+                <div className="overflow-x-auto my-4 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-xs text-left" {...props} />
+                </div>
+              ),
+              thead: ({node, ...props}) => <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300" {...props} />,
+              tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900/10" {...props} />,
+              tr: ({node, ...props}) => <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors" {...props} />,
+              th: ({node, ...props}) => <th className="px-3 py-2 font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700" {...props} />,
+              td: ({node, ...props}) => <td className="px-3 py-2 text-gray-600 dark:text-gray-400" {...props} />,
             }}
           >
             {comment}
