@@ -72,6 +72,7 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
     const rawDataPoint = payload[0]?.payload;
     const netWorthValue = rawDataPoint ? Number(rawDataPoint['純資産']) : 0;
     const changeValue = rawDataPoint ? Number(rawDataPoint['純資産変動']) : 0;
+    const firstNetWorthValue = rawDataPoint ? Number(rawDataPoint['firstNetWorth']) : 0;
 
     return (
       <div className="bg-white dark:bg-gray-700 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-50">
@@ -103,6 +104,9 @@ const CategoryTooltip = ({ active, payload, label }: any) => {
                         <span>純資産変動 (右軸):</span>
                         <span className="font-mono tabular-nums">
                             {changeValue > 0 ? '+' : ''}{new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(changeValue)}円
+                            {firstNetWorthValue !== 0 && (
+                              ` (${changeValue >= 0 ? '+' : ''}${(changeValue / firstNetWorthValue * 100).toFixed(2)}%)`
+                            )}
                         </span>
                     </div>
                 </div>
@@ -297,8 +301,22 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
     return filteredData.map(d => ({
       ...d,
       純資産変動: (d['純資産'] as number ?? 0) - firstNetWorth,
+      firstNetWorth: firstNetWorth,
     }));
   }, [filteredData]);
+
+  const firstNetWorth = useMemo(() => {
+    if (filteredData.length === 0) return 0;
+    return filteredData[0]['純資産'] as number ?? 0;
+  }, [filteredData]);
+
+  const formatRightAxis = (value: number) => {
+    const formattedAmount = formatChangeCurrency(value);
+    if (firstNetWorth === 0) return formattedAmount;
+    const percent = (value / firstNetWorth) * 100;
+    const sign = percent > 0 ? '+' : '';
+    return `${formattedAmount} (${sign}${percent.toFixed(1)}%)`;
+  };
 
   const formatXAxisDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -477,11 +495,11 @@ const AssetTrendChart: React.FC<AssetTrendChartProps> = ({ data, selectedAsset }
       <div style={{ width: '100%', height: 300 }}>
         <ResponsiveContainer>
             {viewMode === 'category' ? (
-                <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <ComposedChart data={chartData} margin={{ top: 5, right: 35, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.3)" />
                     <XAxis dataKey="date" tickFormatter={formatXAxisDate} stroke="rgb(156 163 175)" fontSize={12} tick={{ dy: 5 }} />
                     <YAxis yAxisId="left" tickFormatter={formatCurrency} stroke="rgb(156 163 175)" fontSize={12} />
-                    <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tickFormatter={formatChangeCurrency} stroke="rgb(156 163 175)" fontSize={12} />
+                    <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tickFormatter={formatRightAxis} stroke="rgb(156 163 175)" fontSize={10} width={95} />
                     <Tooltip content={<CategoryTooltip />} />
                     <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}}/>
                     
