@@ -7,6 +7,7 @@ import AssetBreakdownChart from './AssetBreakdownChart';
 import AssetList from './AssetList';
 import MonthlyReport from './MonthlyReport';
 import AiComment from './AiComment';
+import AiDailyComment from './AiDailyComment';
 
 interface DashboardProps {
   totalAssets: number;
@@ -48,7 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         />
       </div>
 
-      <AiComment assets={assets} historyByCategory={assetHistory} />
+      <AiDailyComment assets={assets} historyByCategory={assetHistory} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -87,6 +88,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
         <AssetList assets={assets} grouping={grouping} onAssetSelect={handleAssetSelect} />
       </div>
+
+      <AiComment assets={assets} historyByCategory={assetHistory} />
     </div>
   );
 };
