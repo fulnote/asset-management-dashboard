@@ -4,6 +4,7 @@ import { Asset, AssetType, AssetHistoryByCategoryPoint } from './types';
 import Dashboard from './components/Dashboard';
 import Header from './components/Header';
 import UrlSetup from './components/UrlSetup';
+import { LifePlanSimulator } from './components/LifePlanSimulator';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -11,6 +12,9 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'lifeplan'>('dashboard');
+  const [lifePlanParams, setLifePlanParams] = useState<any>(null);
+  const [lifeEvents, setLifeEvents] = useState<any[]>([]);
   
   const [googleScriptUrl, setGoogleScriptUrl] = useState<string | null>(() => {
     return localStorage.getItem('googleScriptUrl');
@@ -109,6 +113,14 @@ const App: React.FC = () => {
         setAssets(processedAssets as Asset[]);
         // Support both old and new history sheet for backward compatibility during transition
         setHistoryByCategory(data.historyByCategory || data.history || []);
+        
+        // Load life plan parameters and life events if available
+        if (data.lifePlanParams) {
+          setLifePlanParams(data.lifePlanParams);
+        }
+        if (Array.isArray(data.lifeEvents)) {
+          setLifeEvents(data.lifeEvents);
+        }
       } else {
         throw new Error('スプレッドシートから取得したデータの形式が正しくありません。');
       }
@@ -236,18 +248,28 @@ const App: React.FC = () => {
         onResetUrl={handleEnterConfigMode} 
         onRefresh={handleRefresh} 
         spreadsheetUrl={spreadsheetUrl}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
-      <main className="p-2 sm:p-6 lg:p-8">
-        <Dashboard
-          totalAssets={totalAssets}
-          totalLiabilities={totalLiabilities}
-          netWorth={netWorth}
-          totalProfitOrLoss={totalProfitOrLoss}
-          totalProfitOrLossRate={totalProfitOrLossRate}
-          assetHistory={historyByCategory}
-          assetBreakdown={assetBreakdown}
-          assets={assets}
-        />
+      <main className="p-2 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+        {activeTab === 'dashboard' ? (
+          <Dashboard
+            totalAssets={totalAssets}
+            totalLiabilities={totalLiabilities}
+            netWorth={netWorth}
+            totalProfitOrLoss={totalProfitOrLoss}
+            totalProfitOrLossRate={totalProfitOrLossRate}
+            assetHistory={historyByCategory}
+            assetBreakdown={assetBreakdown}
+            assets={assets}
+          />
+        ) : (
+          <LifePlanSimulator 
+            initialAssetsFromDashboard={netWorth} 
+            fetchedParams={lifePlanParams}
+            fetchedEvents={lifeEvents}
+          />
+        )}
       </main>
     </div>
   );

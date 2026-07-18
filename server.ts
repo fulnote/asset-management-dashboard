@@ -297,6 +297,105 @@ ${dodMessage}
     }
   });
 
+  app.post("/api/gemini/lifeplan-advisor", async (req, res) => {
+    try {
+      const { param, hasShortage, shortageAge, finalAssets } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        res.json({
+          error: "GEMINI_API_KEY_MISSING",
+          message: "AIライフプラン診断を表示するには、環境設定で「GEMINI_API_KEY」を設定してください。"
+        });
+        return;
+      }
+
+      if (!param) {
+        res.status(400).json({
+          error: "INVALID_DATA",
+          message: "シミュレーションデータがありません。"
+        });
+        return;
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const formatNum = (num: number) => new Intl.NumberFormat('ja-JP').format(Math.round(num));
+
+      const eventSummary = param.events && param.events.length > 0 
+        ? param.events.map((e: any) => `- ${e.age}歳: ${e.name} (${e.type === 'expense' ? '支出' : '収入'} ${formatNum(e.cost)}円)`).join('\n')
+        : "（ライフイベントの設定はありません）";
+
+      const shortageSummary = hasShortage 
+        ? `⚠️ シミュレーション上、**${shortageAge}歳**で資産が底をつく（0円未満になる）見込みです。`
+        : `✅ 寿命である**${param.lifeExpectancy}歳**時点でも、約**${formatNum(finalAssets)}円**（インフレ調整後の実質価値）の資産が残る見込みで、資産寿命は非常に健全です。`;
+
+      const prompt = `以下のユーザーが設定したライフプランの条件と、計算されたシミュレーション結果に基づいて、プロフェッショナルなファイナンシャル・プランナー（CFP）として総合的なライフプランのアドバイスや資産運用の提案（日本語、Markdown形式）を作成してください。
+
+### シミュレーション設定条件:
+- **基本属性**: 現在 ${param.currentAge}歳、目標リタイア年齢 ${param.retireAge}歳、想定寿命 ${param.lifeExpectancy}歳
+- **初期自己資金（現在資産）**: ${formatNum(param.initialAssets)}円
+- **現役時代の年間収入（世帯手取り）**: ${formatNum(param.annualIncome)}円
+- **現役時代の年間生活費**: ${formatNum(param.annualLivingCost)}円 (年間貯蓄可能額: ${formatNum(param.annualIncome - param.annualLivingCost)}円)
+- **リタイア後の年間生活費**: ${formatNum(param.retireLivingCost)}円
+- **年金受給額（年間）**: ${formatNum(param.annualPension)}円 (受給開始 ${param.pensionStartAge}歳)
+- **資産運用利回り設定**: 期待利回り ${param.investmentYield}% (年利)、想定インフレ率 ${param.inflationRate}% (年率)
+
+### 登録された主要なライフイベントと一時収支:
+${eventSummary}
+
+### シミュレーション結果:
+${shortageSummary}
+- **想定最終資産額（${param.lifeExpectancy}歳時点、インフレ調整後の実質価値）**: ${formatNum(finalAssets)}円
+
+### 指示:
+1. **現状分析と総評**: 
+   - 現在の資産残高と、設定された収入・生活費のバランスから見た「家計の健全性」を評価してください。
+   - インフレ率（${param.inflationRate}%）や、期待運用利回り（${param.investmentYield}%）が資産寿命にどのような影響を与えるか、今回のシミュレーション結果に基づいて具体的に言及してください。
+2. **資産寿命に対する評価とアドバイス**:
+   - 資産が途中で枯渇する場合（${hasShortage ? shortageAge + '歳で底をつく' : '枯渇しない'}）は、家計見直し、リタイア時期の延期、資産運用の利回り向上、またはイベント予算の削減など、**具体的な改善プランを優先度順に複数提案**してください。
+   - 資産が枯渇しない場合でも、よりゆとりのある生活を送るためのアドバイス、相続や終活への配慮、あるいはインフレリスクに対する耐性の評価を行ってください。
+3. **資産運用アドバイス**:
+   - 設定された期待運用利回り（${param.investmentYield}%）を達成するために推奨されるポートフォリオの基本的な考え方（例: インデックス投資、債券、高配当株などの資産配分、または積立NISA/iDeCo等の優遇制度の活用法）を提案してください。
+4. **ライフイベントに対するアドバイス**:
+   - ユーザーが登録した個別のライフイベント（例: 住宅購入、教育費、車買い替えなど）がある場合、その資金準備のアドバイスや発生時期の最適性について一言コメントしてください。
+5. **重要（数値・トーンの正確性）**: 
+   - 専門的ながらも、親身で分かりやすく、希望が持てる前向きなトーンにしてください。
+   - 出力は美しいMarkdown形式で記述してください（適切な見出し（###など）、リスト、太字、引用ブロック、警告ブロック等を用いて、視覚的に優れたレポートにしてください）。`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: "あなたは非常に優秀で、相談者に寄り添う親身なファイナンシャル・プランナー（CFP）であり、資産形成・老後資金設計の専門家です。ライフプランシミュレーションの数値データを的確に分析し、具体的かつ実用的な改善アクションを日本語で提案します。",
+          temperature: 0.7,
+        }
+      });
+
+      res.json({ comment: response.text });
+    } catch (error: any) {
+      console.error("Error communicating with Gemini API for LifePlan:", error);
+      const errorStr = error.message || String(error);
+      let friendlyMessage = `AIライフプラン診断の生成中にエラーが発生しました: ${errorStr}`;
+      
+      if (errorStr.includes("429") || errorStr.includes("quota") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("Limit")) {
+        friendlyMessage = "AI（Gemini）の無料利用枠の制限に達しました。しばらく（数分〜数時間）時間をおいてから再度お試しください。";
+      }
+
+      res.status(500).json({
+        error: "GEMINI_API_ERROR",
+        message: friendlyMessage
+      });
+    }
+  });
+
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

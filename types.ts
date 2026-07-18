@@ -35,3 +35,39 @@ export interface AssetHistoryByCategoryPoint {
   date: string;
   [category: string]: string | number;
 }
+
+export interface LifeEvent {
+  id: string;
+  name: string;
+  age: number;
+  cost: number;
+  type: 'expense' | 'income';
+}
+
+export interface SimulationParam {
+  currentAge: number;
+  retireAge: number;
+  lifeExpectancy: number;
+  annualIncome: number;
+  annualLivingCost: number;
+  retireLivingCost: number;
+  annualPension: number;
+  pensionStartAge: number;
+  initialAssets: number;
+  investmentYield: number;
+  inflationRate: number;
+  events: LifeEvent[];
+}
+
+export interface YearSimulationResult {
+  year: number;
+  age: number;
+  income: number;
+  pension: number;
+  livingCost: number;
+  eventCost: number;
+  investmentGain: number;
+  endAssets: number;
+  endAssetsNominal: number;
+  endAssetsNoInvestment: number;
+}
