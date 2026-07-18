@@ -115,6 +115,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
     }
   }, [fetchedParams, fetchedEvents, initialAssetsFromDashboard]);
 
+  const [showSpreadsheetGuide, setShowSpreadsheetGuide] = useState(true);
+
   // 3. State for adding/editing events
   const [newEvent, setNewEvent] = useState<{ name: string; age: number; cost: number; type: 'expense' | 'income' }>({
     name: '',
@@ -450,6 +452,155 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
           >
             🔄 {isSyncingDashboard ? '同期中...' : 'ダッシュボードの最新資産額を連携'}
           </button>
+        </div>
+
+        {/* 📋 スプレッドシート連携診断 & ガイド */}
+        <div className="mt-6 border border-blue-100 dark:border-blue-900/40 rounded-xl bg-blue-50/30 dark:bg-blue-950/10 overflow-hidden">
+          <button 
+            onClick={() => setShowSpreadsheetGuide(!showSpreadsheetGuide)}
+            className="w-full flex items-center justify-between p-4 text-left font-bold text-sm text-blue-700 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span>📋</span>
+              <span>スプレッドシート連携診断 ＆ 家族構成・教育費設定ガイド</span>
+              {!isUsingSpreadsheetData && (
+                <span className="text-xs font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 animate-pulse">
+                  ⚠️ 要確認
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-blue-500">{showSpreadsheetGuide ? '▲ 閉じる' : '▼ 詳しく見る・診断する'}</span>
+          </button>
+
+          {showSpreadsheetGuide && (
+            <div className="p-4 border-t border-blue-100/50 dark:border-blue-900/30 text-xs text-gray-600 dark:text-gray-300 space-y-4">
+              
+              {/* 1. 診断ステータス */}
+              <div className="bg-white dark:bg-gray-900/60 p-3.5 rounded-lg border border-gray-200/50 dark:border-gray-800">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5 mb-2.5">
+                  🔍 リアルタイムデータ受信ステータス
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-start gap-2 p-2.5 rounded bg-gray-50 dark:bg-gray-800/40">
+                    <span className="text-base">{fetchedParams ? '✅' : '⚠️'}</span>
+                    <div>
+                      <p className="font-bold text-gray-700 dark:text-gray-300">「ライフプラン設定」シートの読込</p>
+                      <p className="text-gray-500 mt-0.5">
+                        {fetchedParams 
+                          ? `成功 (年齢: ${fetchedParams['現在年齢'] || '35'}歳, 収入: ${parseFloat(fetchedParams['年間収入(手取り)'] || 0).toLocaleString()}円 など)` 
+                          : '未検出またはデータが空です。シート名が「ライフプラン設定」になっているか、GASを最新に更新してください。'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-2.5 rounded bg-gray-50 dark:bg-gray-800/40">
+                    <span className="text-base">{(fetchedEvents && fetchedEvents.length > 0) ? '✅' : 'ℹ️'}</span>
+                    <div>
+                      <p className="font-bold text-gray-700 dark:text-gray-300">「ライフイベント」シートの読込</p>
+                      <p className="text-gray-500 mt-0.5">
+                        {(fetchedEvents && fetchedEvents.length > 0) 
+                          ? `成功 (計 ${fetchedEvents.length} 件の教育費やイベントを検出)` 
+                          : '検出されませんでした。シート名「ライフイベント」が存在しない場合、アプリ内蔵のデフォルトのサンプルイベントが使用されます。'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {!isUsingSpreadsheetData && (
+                  <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-100 dark:border-amber-900/40 text-amber-800 dark:text-amber-300">
+                    <p className="font-bold">💡 反映されない時のチェックリスト（最も多い原因）</p>
+                    <ol className="list-decimal list-inside space-y-1 mt-1 leading-relaxed text-amber-700 dark:text-amber-400">
+                      <li>
+                        <strong>Google Apps Script（GAS）が古いまま：</strong>
+                        GASの「Code.gs」を最新コードに上書きした後、<strong>「デプロイ」ボタン ＞ 「新しいデプロイ」から「ウェブアプリ」として再度デプロイし、新しいURLをアプリの「設定（歯車）」に貼り直す</strong>必要があります（上書きしただけでは古いバージョンのAPIが動作したままになります）。
+                      </li>
+                      <li>
+                        <strong>シート名が不一致：</strong>
+                        スプレッドシートに<strong>「ライフプラン設定」</strong>および<strong>「ライフイベント」</strong>というシート名が正確に作成されているかご確認ください。
+                      </li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. テンプレートと家族構成・教育費の設定方法 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* ライフプラン設定の必須キー */}
+                <div className="bg-white dark:bg-gray-900/60 p-3 rounded-lg border border-gray-200/50 dark:border-gray-800">
+                  <h5 className="font-bold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-1">
+                    <span>⚙️</span>
+                    <span>1.「ライフプラン設定」シートの推奨フォーマット</span>
+                  </h5>
+                  <p className="text-gray-500 mb-2">
+                    スプレッドシートに「<strong>ライフプラン設定</strong>」という名前のシートを作成し、<strong>A列に「項目名」、B列に「値」</strong>を以下のように入力してください（コピペ推奨）。
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse border border-gray-200 dark:border-gray-800">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">項目名（A列）</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">値（B列の例）</th>
+                        </tr>
+                      </thead>
+                      <tbody className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">現在年齢</td><td className="p-1 border border-gray-200 dark:border-gray-800">35</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">退職年齢</td><td className="p-1 border border-gray-200 dark:border-gray-800">65</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">想定寿命</td><td className="p-1 border border-gray-200 dark:border-gray-800">90</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間収入(手取り)</td><td className="p-1 border border-gray-200 dark:border-gray-800">6500000</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間生活費(現役)</td><td className="p-1 border border-gray-200 dark:border-gray-800">4000000</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間生活費(老後)</td><td className="p-1 border border-gray-200 dark:border-gray-800">2600000</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年金受給額(年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">1800000</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年金受給開始年齢</td><td className="p-1 border border-gray-200 dark:border-gray-800">65</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">期待運用利回り(%)</td><td className="p-1 border border-gray-200 dark:border-gray-800">4.0</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">想定インフレ率(%)</td><td className="p-1 border border-gray-200 dark:border-gray-800">1.0</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 教育費・家族構成の設定例 */}
+                <div className="bg-white dark:bg-gray-900/60 p-3 rounded-lg border border-gray-200/50 dark:border-gray-800">
+                  <h5 className="font-bold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-1">
+                    <span>🎓</span>
+                    <span>2.「ライフイベント」シート（教育費・家族構成の設定例）</span>
+                  </h5>
+                  <p className="text-gray-500 mb-2">
+                    「<strong>ライフイベント</strong>」というシートに、<strong>「イベント名」「年齢」「金額」「区分」</strong>というヘッダーを持つ4列のテーブルを作成します。子供2人の教育プランを精度高くシミュレートする推奨設定例です。
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse border border-gray-200 dark:border-gray-800">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">イベント名（A列）</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">年齢（B列）</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">金額（C列）</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">区分（D列）</th>
+                        </tr>
+                      </thead>
+                      <tbody className="font-mono text-[10.5px] text-gray-600 dark:text-gray-400">
+                        {/* 長男 */}
+                        <tr className="bg-blue-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長男：私立幼稚園 (3年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">38</td><td className="p-1 border border-gray-200 dark:border-gray-800">550000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-blue-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長男：公立小学校 (6年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">41</td><td className="p-1 border border-gray-200 dark:border-gray-800">350000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-blue-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長男：公立中学校 (3年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">47</td><td className="p-1 border border-gray-200 dark:border-gray-800">500000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-blue-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長男：私立高校 (3年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">50</td><td className="p-1 border border-gray-200 dark:border-gray-800">1000000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-blue-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長男：私立大学 (4年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">53</td><td className="p-1 border border-gray-200 dark:border-gray-800">1500000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        {/* 長女 */}
+                        <tr className="bg-purple-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長女：私立幼稚園 (3年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">40</td><td className="p-1 border border-gray-200 dark:border-gray-800">550000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-purple-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長女：公立小学校 (6年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">43</td><td className="p-1 border border-gray-200 dark:border-gray-800">350000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-purple-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長女：私立中学校 (3年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">49</td><td className="p-1 border border-gray-200 dark:border-gray-800">1000000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-purple-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長女：私立高校 (3年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">52</td><td className="p-1 border border-gray-200 dark:border-gray-800">1000000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                        <tr className="bg-purple-50/20"><td className="p-1 border border-gray-200 dark:border-gray-800">長女：私立大学理系 (4年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">55</td><td className="p-1 border border-gray-200 dark:border-gray-800">1800000</td><td className="p-1 border border-gray-200 dark:border-gray-800">支出</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-2.5 p-2 bg-gray-50 dark:bg-gray-800/50 rounded text-[11px] leading-relaxed">
+                    <span className="font-bold text-blue-600 dark:text-blue-400">💡 複数年の設定コツ：</span><br />
+                    イベント年齢は「<strong>開始年齢（親の年齢）</strong>」を指定すると最もシンプルです。複数年に渡る授業料を設定する場合、上記のように「幼稚園」「小学校」等でまとめて毎年支出にするか、あるいは1年ごとのイベント行に分けても正常に合算してシミュレーションされます。
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
         </div>
 
         {/* Financial Health Milestones */}
