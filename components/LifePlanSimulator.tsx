@@ -225,7 +225,7 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
     }
   }, [fetchedParams, fetchedEvents, initialAssetsFromDashboard]);
 
-  const [showSpreadsheetGuide, setShowSpreadsheetGuide] = useState(true);
+  const [showSpreadsheetGuide, setShowSpreadsheetGuide] = useState(false);
 
   // 3. State for adding/editing events
   const [newEvent, setNewEvent] = useState<{ name: string; age: number; cost: number; type: 'expense' | 'income' }>({
