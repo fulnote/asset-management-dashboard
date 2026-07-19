@@ -51,6 +51,8 @@ export interface SimulationParam {
   annualIncome: number;
   annualLivingCost: number;
   retireLivingCost: number;
+  annualHousingCost: number; // 年間家賃・住居費(現役)
+  retireHousingCost: number; // 年間家賃・住居費(老後)
   annualPension: number;
   pensionStartAge: number;
   initialAssets: number;
@@ -65,6 +67,7 @@ export interface YearSimulationResult {
   income: number;
   pension: number;
   livingCost: number;
+  housingCost: number; // 年間家賃・住居費
   eventCost: number;
   investmentGain: number;
   endAssets: number;

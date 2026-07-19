@@ -19,9 +19,12 @@ const getValueByKeys = (item: any, possibleKeys: string[], defaultVal: any): any
     }
   }
   
-  // 2. Fuzzy match (ignore spaces, lowercase, half/full width)
+  // 2. Fuzzy match (ignore spaces, lowercase, and bracketed column annotations like (A列) or （A列）)
   const itemKeys = Object.keys(item);
-  const normalize = (s: string) => s.toString().trim().toLowerCase().replace(/[\s\t\r\n]/g, '');
+  const normalize = (s: string) => s.toString().trim().toLowerCase()
+    .replace(/[\s\t\r\n]/g, '')
+    .replace(/[\(（][a-zA-Z0-9一-龠ぁ-んァ-ヶ/:]+列(?:の例)?[\)）]/g, '')
+    .trim();
   
   const normalizedPossibleKeys = possibleKeys.map(normalize);
   
@@ -125,6 +128,8 @@ const mapFetchedParams = (fetched: any, initialAssets: number): Partial<Simulati
     annualIncome: getAmountVal(['年間収入(手取り)', '年間収入', 'annualIncome', 'annual_income', '収入', '手取り収入', '手取り'], 6000000),
     annualLivingCost: getAmountVal(['年間生活費(現役)', '現役生活費', 'annualLivingCost', 'annual_living_cost', '生活費', '現役の生活費'], 3600000),
     retireLivingCost: getAmountVal(['年間生活費(老後)', '老後生活費', 'retireLivingCost', 'retire_living_cost', 'リタイア後生活費', '老後の生活費'], 2400000),
+    annualHousingCost: getAmountVal(['年間家賃(現役)', '現役家賃', '年間住居費(現役)', '現役住居費', 'annualHousingCost', 'annual_housing_cost', '家賃', '住居費', '家賃(現役)', '住居費(現役)', '年間家賃', '年間住居費'], 1200000),
+    retireHousingCost: getAmountVal(['年間家賃(老後)', '老後家賃', '年間住居費(老後)', '老後住居費', 'retireHousingCost', 'retire_housing_cost', '家賃(老後)', '住居費(老後)'], 1200000),
     annualPension: getAmountVal(['年金受給額(年間)', '受給年金', 'annualPension', 'annual_pension', '年金', '受給年金額', '受給開始年金'], 1800000),
     pensionStartAge: getVal(['年金受給開始年齢', '受給開始年齢', 'pensionStartAge', 'pension_start_age', '年金開始', '年金開始年齢'], 65),
     initialAssets: initialAssets || 5000000,
@@ -170,6 +175,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
     annualIncome: 6000000,
     annualLivingCost: 3600000,
     retireLivingCost: 2400000,
+    annualHousingCost: 1200000, // デフォルト: 年間120万円（月10万）
+    retireHousingCost: 1200000, // デフォルト: 年間120万円（月10万）
     annualPension: 1800000,
     pensionStartAge: 65,
     initialAssets: initialAssetsFromDashboard || 5000000,
@@ -202,6 +209,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
         annualIncome: mappedP.annualIncome ?? param.annualIncome,
         annualLivingCost: mappedP.annualLivingCost ?? param.annualLivingCost,
         retireLivingCost: mappedP.retireLivingCost ?? param.retireLivingCost,
+        annualHousingCost: mappedP.annualHousingCost ?? param.annualHousingCost,
+        retireHousingCost: mappedP.retireHousingCost ?? param.retireHousingCost,
         annualPension: mappedP.annualPension ?? param.annualPension,
         pensionStartAge: mappedP.pensionStartAge ?? param.pensionStartAge,
         initialAssets: initialAssetsFromDashboard || (mappedP.initialAssets ?? param.initialAssets),
@@ -292,6 +301,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
       annualIncome,
       annualLivingCost,
       retireLivingCost,
+      annualHousingCost,
+      retireHousingCost,
       annualPension,
       pensionStartAge,
       initialAssets,
@@ -322,6 +333,7 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
           income: 0,
           pension: 0,
           livingCost: 0,
+          housingCost: 0,
           eventCost: 0,
           investmentGain: 0,
           endAssets: Math.round(initialAssets),
@@ -335,6 +347,7 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
       const isRetired = age >= retireAge;
       const baseIncome = isRetired ? 0 : annualIncome;
       const baseLivingCost = isRetired ? retireLivingCost : annualLivingCost;
+      const baseHousingCost = isRetired ? retireHousingCost : annualHousingCost;
       const pensionIncome = (age >= pensionStartAge) ? annualPension : 0;
 
       // 2. ライフイベントの収支反映
@@ -356,13 +369,13 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
       // 運用益（年始資産に対して）
       const investmentGainReal = startAssetsReal > 0 ? startAssetsReal * yieldRate : 0;
       // イベントや生活費・定常収入の合算（名目価値）
-      const nominalNetFlow = baseIncome + pensionIncome - baseLivingCost + netEventFlow;
+      const nominalNetFlow = baseIncome + pensionIncome - baseLivingCost - baseHousingCost + netEventFlow;
       // 1年間の名目純増（収支＋運用益）
       const nominalYearlyPlus = nominalNetFlow + (startAssetsReal > 0 ? startAssetsReal * yieldRate : 0);
       
       // インフレ調整（翌年の物価上昇による購買力減少）
       // 資産価値 ＝ (前年資産 ＋ 名目上の純増) / (1 ＋ インフレ率)
-      // これにより、将来の物価上昇に伴う現金の目減りを厳密にシミュレーションします。
+      // これにより、将来 of 物価上昇に伴う現金の目減りを厳密にシミュレーションします。
       const endAssetsRealCalc = (startAssetsReal + nominalNetFlow + investmentGainReal) / (1 + infRate);
       currentAssetsReal = Math.max(0, endAssetsRealCalc); // 0円未満にはマイナス計上も可能だが枯渇表現として0をクリップするか、そのままマイナス（借入）とするか
       // リアルでは0以下になったら破産（0でストップ）にする
@@ -383,6 +396,7 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
         income: baseIncome,
         pension: pensionIncome,
         livingCost: baseLivingCost,
+        housingCost: baseHousingCost,
         eventCost: eventExpense - eventIncome, // 純支出
         investmentGain: Math.round(investmentGainReal),
         endAssets: Math.round(currentAssetsReal),
@@ -493,9 +507,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
     for (let i = 0; i < simulationResults.length; i += 5) {
       const r = simulationResults[i];
       if (!r) continue;
-      const isRetired = r.age >= param.retireAge;
       const totalIncome = r.income + r.pension;
-      const totalExpense = r.livingCost + (r.eventCost > 0 ? r.eventCost : 0);
+      const totalExpense = r.livingCost + r.housingCost + (r.eventCost > 0 ? r.eventCost : 0);
       
       sampled.push({
         age: `${r.age}歳`,
@@ -509,11 +522,11 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
       sampled.push({
         age: `${last.age}歳`,
         '年間収入': Math.round((last.income + last.pension) / 10000),
-        '年間支出': Math.round((last.livingCost + (last.eventCost > 0 ? last.eventCost : 0)) / 10000),
+        '年間支出': Math.round((last.livingCost + last.housingCost + (last.eventCost > 0 ? last.eventCost : 0)) / 10000),
       });
     }
     return sampled;
-  }, [simulationResults, param.retireAge]);
+  }, [simulationResults, param.currentAge]);
 
   return (
     <div className="space-y-8">
@@ -638,8 +651,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
                     <table className="w-full text-left border-collapse border border-gray-200 dark:border-gray-800">
                       <thead>
                         <tr className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">項目名（A列）</th>
-                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">値（B列の例）</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">項目名</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">値</th>
                         </tr>
                       </thead>
                       <tbody className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -649,6 +662,8 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
                         <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間収入(手取り)</td><td className="p-1 border border-gray-200 dark:border-gray-800">6500000</td></tr>
                         <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間生活費(現役)</td><td className="p-1 border border-gray-200 dark:border-gray-800">4000000</td></tr>
                         <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間生活費(老後)</td><td className="p-1 border border-gray-200 dark:border-gray-800">2600000</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間家賃(現役)</td><td className="p-1 border border-gray-200 dark:border-gray-800">1200000</td></tr>
+                        <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年間家賃(老後)</td><td className="p-1 border border-gray-200 dark:border-gray-800">1200000</td></tr>
                         <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年金受給額(年間)</td><td className="p-1 border border-gray-200 dark:border-gray-800">1800000</td></tr>
                         <tr><td className="p-1 border border-gray-200 dark:border-gray-800">年金受給開始年齢</td><td className="p-1 border border-gray-200 dark:border-gray-800">65</td></tr>
                         <tr><td className="p-1 border border-gray-200 dark:border-gray-800">期待運用利回り(%)</td><td className="p-1 border border-gray-200 dark:border-gray-800">4.0</td></tr>
@@ -671,10 +686,10 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
                     <table className="w-full text-left border-collapse border border-gray-200 dark:border-gray-800">
                       <thead>
                         <tr className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">イベント名（A列）</th>
-                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">年齢（B列）</th>
-                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">金額（C列）</th>
-                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">区分（D列）</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">イベント名</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">年齢</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">金額</th>
+                          <th className="p-1.5 border border-gray-200 dark:border-gray-800">区分</th>
                         </tr>
                       </thead>
                       <tbody className="font-mono text-[10.5px] text-gray-600 dark:text-gray-400">
@@ -829,6 +844,31 @@ export const LifePlanSimulator: React.FC<LifePlanSimulatorProps> = ({
                   onChange={e => handleParamChange('retireLivingCost', Number(e.target.value))}
                   className="w-full text-sm p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1 font-medium">現役家賃・住居費(年間)</label>
+                <input
+                  type="number"
+                  step="100000"
+                  value={editingParam.annualHousingCost}
+                  onChange={e => handleParamChange('annualHousingCost', Number(e.target.value))}
+                  className="w-full text-sm p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-[10px] text-gray-400 block mt-0.5">月額換算: {Math.round(editingParam.annualHousingCost / 12 / 1000) / 10}万円</span>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1 font-medium">老後家賃・住居費(年間)</label>
+                <input
+                  type="number"
+                  step="100000"
+                  value={editingParam.retireHousingCost}
+                  onChange={e => handleParamChange('retireHousingCost', Number(e.target.value))}
+                  className="w-full text-sm p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-[10px] text-gray-400 block mt-0.5">月額換算: {Math.round(editingParam.retireHousingCost / 12 / 1000) / 10}万円</span>
               </div>
             </div>
 
