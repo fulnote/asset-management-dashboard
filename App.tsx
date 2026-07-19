@@ -6,6 +6,15 @@ import Header from './components/Header';
 import UrlSetup from './components/UrlSetup';
 import { LifePlanSimulator } from './components/LifePlanSimulator';
 
+const safeParseFloat = (val: any): number => {
+  if (val === undefined || val === null || val === '') return NaN;
+  if (typeof val === 'number') return val;
+  // カンマ、通貨記号、円マークなどを取り除いて数値のみにする
+  const cleanStr = val.toString().trim().replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleanStr);
+  return isNaN(parsed) ? NaN : parsed;
+};
+
 const App: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [historyByCategory, setHistoryByCategory] = useState<AssetHistoryByCategoryPoint[]>([]);
@@ -58,12 +67,74 @@ const App: React.FC = () => {
       
       if (data && Array.isArray(data.assets) && (Array.isArray(data.history) || Array.isArray(data.historyByCategory))) {
         const processedAssets = data.assets
+          .map((rawAsset: any) => {
+            if (!rawAsset) return null;
+            const asset: any = {};
+            Object.keys(rawAsset).forEach((key) => {
+              const k = key.trim().toLowerCase();
+              const val = rawAsset[key];
+              if (k === 'name' || k === '資産名' || k === '名前' || k === '銘柄名' || k === '銘柄' || k === '品名') {
+                asset.name = val;
+              } else if (k === 'type' || k === '種類' || k === '資産タイプ' || k === 'タイプ' || k === 'アセットクラス' || k === 'カテゴリ') {
+                asset.type = val;
+              } else if (k === 'value' || k === '評価額' || k === '残高' || k === '金額' || k === '評価残高') {
+                asset.value = val;
+              } else if (k === 'shares' || k === '数量' || k === '保有数量' || k === '口数' || k === '株数') {
+                asset.shares = val;
+              } else if (k === 'avgpurchaseprice' || k === '平均取得価格' || k === '平均取得単価' || k === '取得単価' || k === '平均単価' || k === '取得価格') {
+                asset.avgPurchasePrice = val;
+              } else if (k === 'currentprice' || k === '現在価格' || k === '現在単価' || k === '現在値' || k === '時価') {
+                asset.currentPrice = val;
+              } else if (k === 'account' || k === '口座' || k === '口座区分' || k === '金融機関' || k === '口座名') {
+                asset.account = val;
+              } else if (k === 'owner' || k === '保有者' || k === '名義人' || k === '所有者') {
+                asset.owner = val;
+              } else if (k === 'tickersymbol' || k === 'ティッカー' || k === 'シンボル' || k === 'コード' || k === 'ティッカーシンボル') {
+                asset.tickerSymbol = val;
+              } else if (k === 'daychange' || k === '前日比' || k === '前日比額' || k === '前日差') {
+                asset.dayChange = val;
+              } else {
+                asset[key] = val;
+              }
+            });
+
+            // Fallbacks in case keys were already mapped or slightly different
+            if (rawAsset.name && !asset.name) asset.name = rawAsset.name;
+            if (rawAsset.type && !asset.type) asset.type = rawAsset.type;
+            if (rawAsset.value !== undefined && asset.value === undefined) asset.value = rawAsset.value;
+
+            // 資産タイプの正規化 (日本語/英語の表記ブレを吸収)
+            if (asset.type) {
+              const t = asset.type.toString().trim();
+              if (/^現金|^預金|^キャッシュ|^cash/i.test(t)) asset.type = AssetType.Cash;
+              else if (/^株式\(現物\)|^株式|^現物株|^米国株|^日本株|^stocks|^stock/i.test(t)) asset.type = AssetType.Stocks;
+              else if (/^株式\(信用\)|^信用取引|^信用株|^margin/i.test(t)) asset.type = AssetType.MarginStocks;
+              else if (/^FX\(現物\)|^fx現物/i.test(t)) asset.type = AssetType.SpotFX;
+              else if (/^FX\(レバレッジ\)|^fx|^レバfx|^forex/i.test(t)) asset.type = AssetType.LeveragedFX;
+              else if (/^投資信託|^投信|^インデックス|^mutual|^fund/i.test(t)) asset.type = AssetType.InvestmentTrust;
+              else if (/^暗号資産|^仮想通貨|^ビットコイン|^crypto/i.test(t)) asset.type = AssetType.Crypto;
+              else if (/^債券|^国債|^社債|^bond/i.test(t)) asset.type = AssetType.Bonds;
+              else if (/^不動産|^マンション|^realestate|^real/i.test(t)) asset.type = AssetType.RealEstate;
+              else if (/^DC|^確定拠出年金|^ideco|^イデコ/i.test(t)) asset.type = AssetType.DC;
+              else if (/^負債|^借入|^ローン|^liability|^debt/i.test(t)) asset.type = AssetType.Liability;
+              else if (/^その他/i.test(t)) asset.type = AssetType.Other;
+              else {
+                const exactMatch = Object.values(AssetType).find(v => v === t);
+                if (exactMatch) asset.type = exactMatch;
+                else asset.type = AssetType.Other;
+              }
+            } else {
+              asset.type = AssetType.Other;
+            }
+
+            return asset;
+          })
           .filter((asset: any) => asset && asset.name) // Filter out empty rows
           .map((asset: any, index: number) => {
-            const shares = parseFloat(asset.shares);
-            const avgPurchasePrice = parseFloat(asset.avgPurchasePrice);
-            const currentPrice = parseFloat(asset.currentPrice);
-            let value = parseFloat(asset.value); // Keep the original value as a fallback
+            const shares = safeParseFloat(asset.shares);
+            const avgPurchasePrice = safeParseFloat(asset.avgPurchasePrice);
+            const currentPrice = safeParseFloat(asset.currentPrice);
+            let value = safeParseFloat(asset.value); // Keep the original value as a fallback
 
             const hasCalculationData = !isNaN(shares) && !isNaN(currentPrice);
 
