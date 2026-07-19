@@ -9,8 +9,17 @@ import { LifePlanSimulator } from './components/LifePlanSimulator';
 const safeParseFloat = (val: any): number => {
   if (val === undefined || val === null || val === '') return NaN;
   if (typeof val === 'number') return val;
+  
+  let str = val.toString().trim();
+  // ▲ や △ をマイナス記号に変換
+  str = str.replace(/^[▲△]/, '-');
+  // (1,234) などのカッコで囲まれた負数を -1234 に変換
+  if (str.startsWith('(') && str.endsWith(')')) {
+    str = '-' + str.slice(1, -1);
+  }
+  
   // カンマ、通貨記号、円マークなどを取り除いて数値のみにする
-  const cleanStr = val.toString().trim().replace(/[^0-9.-]/g, '');
+  const cleanStr = str.replace(/[^0-9.-]/g, '');
   const parsed = parseFloat(cleanStr);
   return isNaN(parsed) ? NaN : parsed;
 };
@@ -93,6 +102,10 @@ const App: React.FC = () => {
                 asset.tickerSymbol = val;
               } else if (k === 'daychange' || k === '前日比' || k === '前日比額' || k === '前日差') {
                 asset.dayChange = val;
+              } else if (k === 'profitorloss' || k === '評価損益' || k === '損益' || k === '含み損益' || k === '評価損益額' || k === 'pl' || k === 'gain') {
+                asset.profitOrLoss = val;
+              } else if (k === 'profitorlossrate' || k === '評価損益率' || k === '損益率' || k === 'plrate') {
+                asset.profitOrLossRate = val;
               } else {
                 asset[key] = val;
               }
@@ -134,19 +147,7 @@ const App: React.FC = () => {
             const shares = safeParseFloat(asset.shares);
             const avgPurchasePrice = safeParseFloat(asset.avgPurchasePrice);
             const currentPrice = safeParseFloat(asset.currentPrice);
-            let value = safeParseFloat(asset.value); // Keep the original value as a fallback
-
-            const hasCalculationData = !isNaN(shares) && !isNaN(currentPrice);
-
-            if (hasCalculationData) {
-                if (asset.type === AssetType.MarginStocks || asset.type === AssetType.LeveragedFX) {
-                    if (!isNaN(avgPurchasePrice)) {
-                        value = (currentPrice - avgPurchasePrice) * shares;
-                    }
-                } else if ([AssetType.Stocks, AssetType.InvestmentTrust, AssetType.Crypto, AssetType.SpotFX].includes(asset.type)) {
-                    value = currentPrice * shares;
-                }
-            }
+            const value = safeParseFloat(asset.value); // スプレッドシートの値をそのまま使用
 
             const baseAsset = {
                 ...asset,
@@ -157,28 +158,34 @@ const App: React.FC = () => {
                 currentPrice: isNaN(currentPrice) ? undefined : currentPrice,
             };
             
+            // 評価損益の処理。スプレッドシートから評価損益がすでに取得できている場合はその値をそのまま採用
+            let profitOrLoss = safeParseFloat(asset.profitOrLoss);
+            let profitOrLossRate = safeParseFloat(asset.profitOrLossRate);
+            const purchaseAmount = (baseAsset.shares != null && baseAsset.avgPurchasePrice != null) 
+              ? baseAsset.shares * baseAsset.avgPurchasePrice 
+              : NaN;
+
             const investableAssetTypes = [AssetType.Stocks, AssetType.MarginStocks, AssetType.LeveragedFX, AssetType.SpotFX, AssetType.InvestmentTrust, AssetType.Crypto];
-            if (investableAssetTypes.includes(baseAsset.type) && baseAsset.shares != null && baseAsset.avgPurchasePrice != null) {
-                const purchaseAmount = baseAsset.shares * baseAsset.avgPurchasePrice;
-                
-                let profitOrLoss;
+            
+            // スプレッドシートに評価損益が定義されていない（NaN）場合のみ、React側でフォールバック計算
+            if (isNaN(profitOrLoss) && investableAssetTypes.includes(baseAsset.type) && !isNaN(purchaseAmount)) {
                 if ([AssetType.Stocks, AssetType.SpotFX, AssetType.InvestmentTrust, AssetType.Crypto].includes(baseAsset.type)) {
                     profitOrLoss = baseAsset.value - purchaseAmount;
                 } else { // MarginStocks or LeveragedFX
                     profitOrLoss = baseAsset.value;
                 }
                 
-                const profitOrLossRate = purchaseAmount !== 0 ? profitOrLoss / purchaseAmount : 0;
-                
-                return { 
-                    ...baseAsset, 
-                    purchaseAmount: isNaN(purchaseAmount) ? undefined : purchaseAmount, 
-                    profitOrLoss: isNaN(profitOrLoss) ? undefined : profitOrLoss, 
-                    profitOrLossRate: isNaN(profitOrLossRate) ? undefined : profitOrLossRate 
-                };
+                if (isNaN(profitOrLossRate)) {
+                    profitOrLossRate = purchaseAmount !== 0 ? profitOrLoss / purchaseAmount : 0;
+                }
             }
 
-            return baseAsset;
+            return { 
+                ...baseAsset, 
+                purchaseAmount: isNaN(purchaseAmount) ? undefined : purchaseAmount, 
+                profitOrLoss: isNaN(profitOrLoss) ? undefined : profitOrLoss, 
+                profitOrLossRate: isNaN(profitOrLossRate) ? undefined : profitOrLossRate 
+            };
           });
         
         setAssets(processedAssets as Asset[]);
@@ -228,9 +235,18 @@ const App: React.FC = () => {
     fetchData();
   };
 
-  const totalAssets = useMemo(() => assets.filter(a => a.type !== AssetType.Liability).reduce((sum, a) => sum + a.value, 0), [assets]);
-  const totalLiabilities = useMemo(() => assets.filter(a => a.type === AssetType.Liability).reduce((sum, a) => sum + a.value, 0), [assets]);
-  const netWorth = totalAssets + totalLiabilities;
+  const totalAssets = useMemo(() => {
+    // 資産シートのD列(Value)をすべて単純に合計します（負債などのマイナス値も含めてそのまま合計）
+    return assets.reduce((sum, a) => sum + (a.value ?? 0), 0);
+  }, [assets]);
+
+  const totalLiabilities = useMemo(() => {
+    return assets
+      .filter(a => a.type === AssetType.Liability)
+      .reduce((sum, a) => sum + (a.value ?? 0), 0);
+  }, [assets]);
+
+  const netWorth = totalAssets;
   
   const totalProfitOrLoss = useMemo(() => {
       return assets.reduce((sum, asset) => sum + (asset.profitOrLoss ?? 0), 0);
