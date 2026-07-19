@@ -9,30 +9,126 @@ interface LifePlanSimulatorProps {
   fetchedEvents?: any[];
 }
 
+const getValueByKeys = (item: any, possibleKeys: string[], defaultVal: any): any => {
+  if (!item) return defaultVal;
+  
+  // 1. Exact match
+  for (const k of possibleKeys) {
+    if (item[k] !== undefined && item[k] !== null && item[k] !== '') {
+      return item[k];
+    }
+  }
+  
+  // 2. Fuzzy match (ignore spaces, lowercase, half/full width)
+  const itemKeys = Object.keys(item);
+  const normalize = (s: string) => s.toString().trim().toLowerCase().replace(/[\s\t\r\n]/g, '');
+  
+  const normalizedPossibleKeys = possibleKeys.map(normalize);
+  
+  for (const itemKey of itemKeys) {
+    const normItemKey = normalize(itemKey);
+    const idx = normalizedPossibleKeys.indexOf(normItemKey);
+    if (idx !== -1) {
+      if (item[itemKey] !== undefined && item[itemKey] !== null && item[itemKey] !== '') {
+        return item[itemKey];
+      }
+    }
+  }
+  
+  return defaultVal;
+};
+
+const parseAmountWithUnit = (val: any, defaultVal: number = 0): number => {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  
+  let str = val.toString().trim().replace(/,/g, '');
+  if (str === '') return defaultVal;
+
+  // Remove currency symbols
+  str = str.replace(/[¥￥円]/g, '');
+
+  let amount = 0;
+  let hasUnit = false;
+  
+  // Handle "億" (hundred million)
+  if (str.includes('億')) {
+    hasUnit = true;
+    const parts = str.split('億');
+    const okuVal = parseFloat(parts[0].replace(/[^0-9.-]/g, ''));
+    if (!isNaN(okuVal)) {
+      amount += okuVal * 100000000;
+    }
+    str = parts[1] || '';
+  }
+  
+  // Handle "万" (ten thousand)
+  if (str.includes('万')) {
+    hasUnit = true;
+    const parts = str.split('万');
+    const manVal = parseFloat(parts[0].replace(/[^0-9.-]/g, ''));
+    if (!isNaN(manVal)) {
+      amount += manVal * 10000;
+    }
+    str = parts[1] || '';
+  }
+  
+  // Parse remaining numeric value
+  const cleanStr = str.replace(/[^0-9.-]/g, '');
+  if (cleanStr !== '') {
+    const remaining = parseFloat(cleanStr);
+    if (!isNaN(remaining)) {
+      if (hasUnit) {
+        amount += remaining;
+      } else {
+        // If there are no units and the number is small (e.g., under 30,000), 
+        // it is highly likely written in "万円" units (e.g., "300" for 3M JPY).
+        // Standard large amounts like "3000000" are kept as raw Yen.
+        if (remaining > 0 && remaining < 30000) {
+          amount = remaining * 10000;
+        } else {
+          amount = remaining;
+        }
+      }
+    }
+  } else if (!hasUnit) {
+    return defaultVal;
+  }
+  
+  return amount;
+};
+
 const mapFetchedParams = (fetched: any, initialAssets: number): Partial<SimulationParam> => {
   if (!fetched) return {};
   
   const getVal = (keys: string[], defaultVal: number): number => {
-    for (const k of keys) {
-      if (fetched[k] !== undefined && fetched[k] !== null && fetched[k] !== '') {
-        const parsed = parseFloat(fetched[k].toString().replace(/[,%円]/g, ''));
-        if (!isNaN(parsed)) return parsed;
-      }
+    const raw = getValueByKeys(fetched, keys, undefined);
+    if (raw !== undefined && raw !== null && raw !== '') {
+      const parsed = parseFloat(raw.toString().replace(/[,%円]/g, ''));
+      if (!isNaN(parsed)) return parsed;
+    }
+    return defaultVal;
+  };
+
+  const getAmountVal = (keys: string[], defaultVal: number): number => {
+    const raw = getValueByKeys(fetched, keys, undefined);
+    if (raw !== undefined && raw !== null && raw !== '') {
+      const parsed = parseAmountWithUnit(raw, -1);
+      if (parsed !== -1) return parsed;
     }
     return defaultVal;
   };
 
   return {
     currentAge: getVal(['現在年齢', 'currentAge', 'current_age', '年齢'], 35),
-    retireAge: getVal(['退職年齢', 'retireAge', 'retire_age', '退職予定年齢', '退職'], 65),
+    retireAge: getVal(['退職年齢', 'retireAge', 'retire_age', '退職予定年齢', '退職', '引退年齢', '退職時期'], 65),
     lifeExpectancy: getVal(['想定寿命', 'lifeExpectancy', 'life_expectancy', '寿命', '目標寿命'], 90),
-    annualIncome: getVal(['年間収入(手取り)', '年間収入', 'annualIncome', 'annual_income', '収入', '手取り収入'], 6000000),
-    annualLivingCost: getVal(['年間生活費(現役)', '現役生活費', 'annualLivingCost', 'annual_living_cost', '生活費', '現役の生活費'], 3600000),
-    retireLivingCost: getVal(['年間生活費(老後)', '老後生活費', 'retireLivingCost', 'retire_living_cost', 'リタイア後生活費', '老後の生活費'], 2400000),
-    annualPension: getVal(['年金受給額(年間)', '受給年金', 'annualPension', 'annual_pension', '年金', '受給年金額'], 1800000),
+    annualIncome: getAmountVal(['年間収入(手取り)', '年間収入', 'annualIncome', 'annual_income', '収入', '手取り収入', '手取り'], 6000000),
+    annualLivingCost: getAmountVal(['年間生活費(現役)', '現役生活費', 'annualLivingCost', 'annual_living_cost', '生活費', '現役の生活費'], 3600000),
+    retireLivingCost: getAmountVal(['年間生活費(老後)', '老後生活費', 'retireLivingCost', 'retire_living_cost', 'リタイア後生活費', '老後の生活費'], 2400000),
+    annualPension: getAmountVal(['年金受給額(年間)', '受給年金', 'annualPension', 'annual_pension', '年金', '受給年金額', '受給開始年金'], 1800000),
     pensionStartAge: getVal(['年金受給開始年齢', '受給開始年齢', 'pensionStartAge', 'pension_start_age', '年金開始', '年金開始年齢'], 65),
     initialAssets: initialAssets || 5000000,
-    investmentYield: getVal(['期待運用利回り(%)', '利回り', 'investmentYield', 'investment_yield', '運用利回り', '期待利回り'], 3.0),
+    investmentYield: getVal(['期待運用利回り(%)', '利回り', 'investmentYield', 'investment_yield', '運用利回り', '期待利回り', '年利'], 3.0),
     inflationRate: getVal(['想定インフレ率(%)', 'インフレ率', 'inflationRate', 'inflation_rate', 'インフレ'], 1.0),
   };
 };
@@ -40,17 +136,22 @@ const mapFetchedParams = (fetched: any, initialAssets: number): Partial<Simulati
 const mapFetchedEvents = (fetchedArray: any[]): LifeEvent[] => {
   if (!Array.isArray(fetchedArray) || fetchedArray.length === 0) return [];
   return fetchedArray.map((item, idx) => {
-    const age = parseInt(item['年齢'] || item['age'] || item['発生年齢'] || 40);
-    const name = item['イベント名'] || item['name'] || item['イベント'] || item['収支内容'] || `イベント ${idx + 1}`;
-    const cost = parseFloat((item['金額'] || item['cost'] || item['収支金額'] || item['費用'] || 0).toString().replace(/[,円]/g, ''));
-    const rawType = item['区分'] || item['type'] || 'expense';
+    const rawAge = getValueByKeys(item, ['年齢', 'age', '発生年齢', '発生時期', '時期'], 40);
+    const age = parseInt(rawAge.toString().replace(/[^0-9.-]/g, ''));
+    
+    const name = getValueByKeys(item, ['イベント名', 'name', 'イベント', '収支内容', '内容', '項目'], `イベント ${idx + 1}`);
+    
+    const rawCost = getValueByKeys(item, ['金額', 'cost', '収支金額', '費用', '支出', '収入金額', '予算'], '');
+    const cost = parseAmountWithUnit(rawCost, 0);
+    
+    const rawType = getValueByKeys(item, ['区分', 'type', '収支タイプ', 'カテゴリ', '分類'], 'expense');
     const type = (rawType.toString().includes('収') || rawType.toString() === 'income' || rawType.toString() === '収入') ? 'income' : 'expense' as const;
 
     return {
       id: `sheet-${idx}`,
       name,
       age: isNaN(age) ? 40 : age,
-      cost: isNaN(cost) ? 0 : cost,
+      cost: cost,
       type: type as 'expense' | 'income',
     };
   }).sort((a, b) => a.age - b.age);
